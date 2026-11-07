@@ -9,8 +9,8 @@
  */
 
 import { useEffect, useState } from 'react';
-import socialPostingService from '@/services/SocialPostingService';
-import { CheckCircle, Clock, Globe, Image, AtSign, Plus, RefreshCw, Trash2 } from 'lucide-react';
+import socialPostingService, { LinkedInOrganization, LinkedInSurface } from '@/services/SocialPostingService';
+import { CheckCircle, Clock, Globe, Image, AtSign, Briefcase, Plus, RefreshCw, Trash2 } from 'lucide-react';
 
 const SURFACES = [
   { platform: 'meta_facebook', surface: 'facebook_page', label: 'Facebook Page', icon: Globe },
@@ -19,7 +19,16 @@ const SURFACES = [
 ];
 
 interface SurfaceState { id: string; targetRef: string; displayName: string | null; tokenExpired: boolean; }
-interface Status { meta: { connected: boolean; reauthorizationRequired: boolean; scopesMissing: string[]; surfaces: Record<string, SurfaceState> }; }
+interface Status {
+  meta: { connected: boolean; reauthorizationRequired: boolean; scopesMissing: string[]; surfaces: Record<string, SurfaceState> };
+  linkedin?: {
+    connected: boolean;
+    memberName: string | null;
+    reauthorizationRequired: boolean;
+    tokenExpired: boolean;
+    surfaces: Record<string, LinkedInSurface>;
+  };
+}
 
 export default function SocialPostingPage() {
   const [status, setStatus] = useState<Status | null>(null);
@@ -30,8 +39,11 @@ export default function SocialPostingPage() {
   const [body, setBody] = useState('');
   const [linkUrl, setLinkUrl] = useState('');
   const [selected, setSelected] = useState<string[]>([]);
+  const [linkedinSelected, setLinkedinSelected] = useState<Set<string>>(new Set());
   const [scheduledFor, setScheduledFor] = useState('');
   const [busy, setBusy] = useState(false);
+  const [liOrgs, setLiOrgs] = useState<LinkedInOrganization[] | null>(null);
+  const [liBusy, setLiBusy] = useState<string | null>(null);
 
   const load = async () => {
     setLoading(true);
@@ -70,7 +82,21 @@ export default function SocialPostingPage() {
           setError(`${platform}: ${e.message || 'Publish failed'}`);
         }
       }
-      if (!error) { setBody(''); setLinkUrl(''); setScheduledFor(''); setSelected([]); }
+      // LinkedIn posts per connected organization page (member token is shared).
+      for (const targetRef of linkedinSelected) {
+        try {
+          await socialPostingService.createPost({
+            platform: 'linkedin',
+            targetRef,
+            body,
+            linkUrl: linkUrl || undefined,
+            scheduledFor: !immediate && scheduledFor ? new Date(scheduledFor).toISOString() : undefined,
+          });
+        } catch (e: any) {
+          setError(`linkedin: ${e.message || 'Publish failed'}`);
+        }
+      }
+      if (!error) { setBody(''); setLinkUrl(''); setScheduledFor(''); setSelected([]); setLinkedinSelected(new Set()); }
       await load();
     } finally {
       setBusy(false);
@@ -87,6 +113,55 @@ export default function SocialPostingPage() {
     await load();
   };
 
+  const connectLinkedIn = async () => {
+    setLiBusy('authorize');
+    try {
+      const url = await socialPostingService.getLinkedInAuthorizeUrl();
+      window.location.href = url;
+    } catch (e: any) {
+      setError(e.message || 'LinkedIn connect failed');
+      setLiBusy(null);
+    }
+  };
+
+  const loadLinkedInOrgs = async () => {
+    setLiBusy('orgs');
+    try {
+      const { organizations } = await socialPostingService.getLinkedInOrganizations();
+      setLiOrgs(organizations);
+    } catch (e: any) {
+      setError(e.message || 'Failed to load LinkedIn organizations');
+    } finally {
+      setLiBusy(null);
+    }
+  };
+
+  const connectLinkedInOrg = async (urn: string) => {
+    setLiBusy(urn);
+    try {
+      await socialPostingService.selectLinkedInSurface(urn);
+      setLiOrgs(null);
+      await load();
+    } catch (e: any) {
+      setError(e.message || 'Failed to connect organization page');
+    } finally {
+      setLiBusy(null);
+    }
+  };
+
+  const disconnectLinkedInSurface = async (id: string) => {
+    await socialPostingService.disconnectLinkedInSurface(id);
+    await load();
+  };
+
+  const toggleLinkedIn = (urn: string) =>
+    setLinkedinSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(urn)) next.delete(urn);
+      else next.add(urn);
+      return next;
+    });
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
@@ -96,6 +171,8 @@ export default function SocialPostingPage() {
   }
 
   const surfaces = status?.meta.surfaces ?? {};
+  const linkedinSurfaces = Object.values(status?.linkedin?.surfaces ?? {});
+  const canPost = selected.length > 0 || linkedinSelected.size > 0;
 
   return (
     <div className="max-w-4xl mx-auto space-y-8">
@@ -143,6 +220,81 @@ export default function SocialPostingPage() {
         </p>
       </section>
 
+      {/* LinkedIn platform profile */}
+      <section className="bg-white border border-neutral-200 rounded-xl p-5">
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="font-semibold text-neutral-900 flex items-center gap-2">
+            <Briefcase className="w-4 h-4" /> LinkedIn company pages
+          </h2>
+          {status?.linkedin?.connected ? (
+            <button onClick={loadLinkedInOrgs} disabled={liBusy === 'orgs'} className="text-xs text-blue-600 hover:underline disabled:opacity-50">
+              {liBusy === 'orgs' ? 'loading…' : 'choose pages'}
+            </button>
+          ) : (
+            <button onClick={connectLinkedIn} disabled={liBusy === 'authorize'} className="text-xs px-3 py-1.5 bg-blue-600 text-white rounded-lg disabled:opacity-50">
+              {liBusy === 'authorize' ? 'redirecting…' : 'Connect LinkedIn'}
+            </button>
+          )}
+        </div>
+        {status?.linkedin?.reauthorizationRequired && (
+          <div className="mb-3 bg-amber-50 border border-amber-200 rounded-lg p-3 text-amber-800 text-sm">
+            LinkedIn authorization needs to be renewed — reconnect to keep posting.
+          </div>
+        )}
+        {status?.linkedin?.tokenExpired && !status.linkedin.reauthorizationRequired && (
+          <div className="mb-3 bg-amber-50 border border-amber-200 rounded-lg p-3 text-amber-800 text-sm">
+            The LinkedIn token has expired — the refresh job will renew it, or reconnect if posts start failing.
+          </div>
+        )}
+        {status?.linkedin?.connected && (
+          <div className="grid gap-2">
+            {Object.values(status.linkedin.surfaces).map((s) => (
+              <div key={s.id} className="flex items-center justify-between border border-neutral-100 rounded-lg px-3 py-2">
+                <div className="flex items-center gap-2">
+                  <Briefcase className="w-4 h-4 text-neutral-500" />
+                  <span className="text-sm font-medium">{s.displayName || s.targetRef}</span>
+                  {s.memberRole && <span className="text-xs text-neutral-400">{s.memberRole.toLowerCase().replace(/_/g, ' ')}</span>}
+                </div>
+                <button onClick={() => disconnectLinkedInSurface(s.id)} className="text-xs text-neutral-400 hover:text-red-500">disconnect</button>
+              </div>
+            ))}
+            {Object.keys(status.linkedin.surfaces).length === 0 && (
+              <p className="text-sm text-neutral-500">No organization pages connected yet — use “choose pages” to pick the pages you administer.</p>
+            )}
+          </div>
+        )}
+        {!status?.linkedin?.connected && (
+          <p className="text-sm text-neutral-500">
+            Connect a LinkedIn member account, then pick the company pages it administers. Requires the Community Management API product on our LinkedIn app.
+          </p>
+        )}
+        {liOrgs && liOrgs.length > 0 && (
+          <div className="mt-3 border border-neutral-200 rounded-lg divide-y divide-neutral-100">
+            {liOrgs.map((o) => {
+              const connected = Object.values(status?.linkedin?.surfaces ?? {}).some((s) => s.targetRef === o.urn);
+              return (
+                <div key={o.urn} className="flex items-center justify-between px-3 py-2">
+                  <div>
+                    <p className="text-sm font-medium">{o.name}</p>
+                    <p className="text-xs text-neutral-400">{o.role.toLowerCase().replace(/_/g, ' ')}</p>
+                  </div>
+                  {connected ? (
+                    <span className="text-xs text-emerald-600 inline-flex items-center gap-1"><CheckCircle className="w-3.5 h-3.5" /> connected</span>
+                  ) : (
+                    <button onClick={() => connectLinkedInOrg(o.urn)} disabled={liBusy === o.urn} className="text-xs px-3 py-1 border border-blue-600 text-blue-600 rounded-lg disabled:opacity-50">
+                      {liBusy === o.urn ? 'connecting…' : 'connect'}
+                    </button>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+        {liOrgs && liOrgs.length === 0 && (
+          <p className="text-sm text-neutral-500 mt-3">No administrable organization pages found for this LinkedIn member.</p>
+        )}
+      </section>
+
       {/* Composer */}
       <section className="bg-white border border-neutral-200 rounded-xl p-5 space-y-4">
         <h2 className="font-semibold text-neutral-900">Compose</h2>
@@ -174,6 +326,18 @@ export default function SocialPostingPage() {
               </button>
             );
           })}
+          {linkedinSurfaces.map((s) => {
+            const active = linkedinSelected.has(s.targetRef);
+            return (
+              <button
+                key={s.id}
+                onClick={() => toggleLinkedIn(s.targetRef)}
+                className={`px-3 py-1.5 rounded-lg text-sm border inline-flex items-center gap-1.5 ${active ? 'bg-blue-600 text-white border-blue-600' : 'border-neutral-300 text-neutral-700 hover:bg-neutral-50'}`}
+              >
+                <Briefcase className="w-3.5 h-3.5" /> {s.displayName || 'LinkedIn page'}
+              </button>
+            );
+          })}
         </div>
         <div className="flex items-center gap-3">
           <input
@@ -184,14 +348,14 @@ export default function SocialPostingPage() {
           />
           <button
             onClick={() => submit(true)}
-            disabled={busy || !body.trim() || selected.length === 0}
+            disabled={busy || !body.trim() || !canPost}
             className="inline-flex items-center gap-1.5 px-4 py-2 bg-blue-600 text-white text-sm rounded-lg disabled:opacity-50"
           >
             <Plus className="w-4 h-4" /> Publish now
           </button>
           <button
             onClick={() => submit(false)}
-            disabled={busy || !body.trim() || selected.length === 0 || !scheduledFor}
+            disabled={busy || !body.trim() || !canPost || !scheduledFor}
             className="inline-flex items-center gap-1.5 px-4 py-2 border border-blue-600 text-blue-600 text-sm rounded-lg disabled:opacity-50"
           >
             <Clock className="w-4 h-4" /> Schedule

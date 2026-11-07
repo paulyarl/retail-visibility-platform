@@ -38,7 +38,7 @@ export default function ContentComposer({
     body: string;
     mediaUrl?: string;
     scheduledFor?: string;
-    destinations: { gbp?: boolean; meta?: string[]; place?: boolean };
+    destinations: { gbp?: boolean; meta?: string[]; linkedin?: boolean; place?: boolean };
   }) => void;
 }) {
   const [body, setBody] = useState('');
@@ -47,10 +47,12 @@ export default function ContentComposer({
   const [gbp, setGbp] = useState(true);
   const [place, setPlace] = useState(true);
   const [meta, setMeta] = useState<Set<string>>(new Set(['meta_facebook']));
+  const [linkedin, setLinkedin] = useState(true);
 
   const gbpEnabled = channels.find((c) => c.key === 'google_gbp')?.capability.enabled ?? false;
   const socialEnabled = channels.find((c) => c.key === 'social_meta')?.capability.enabled ?? false;
-  const anyDestination = (placeFeedEnabled && place) || (gbpEnabled && gbp) || (socialEnabled && meta.size > 0);
+  const linkedinEnabled = channels.find((c) => c.key === 'social_linkedin')?.capability.enabled ?? false;
+  const anyDestination = (placeFeedEnabled && place) || (gbpEnabled && gbp) || (socialEnabled && meta.size > 0) || (linkedinEnabled && linkedin);
   const canSubmit = body.trim().length > 0 && anyDestination && !busy;
 
   const toggleMeta = (key: string) =>
@@ -109,6 +111,10 @@ export default function ContentComposer({
                 {d.label}{!socialEnabled ? ' 🔒' : ''}
               </label>
             ))}
+            <label className={`inline-flex items-center gap-2 border rounded-full px-3 py-1.5 text-sm ${linkedinEnabled ? 'cursor-pointer' : 'opacity-40 cursor-not-allowed'} ${linkedin && linkedinEnabled ? 'bg-blue-50 border-blue-300 text-blue-700' : 'border-gray-200 text-gray-600'}`}>
+              <input type="checkbox" className="sr-only" checked={linkedin && linkedinEnabled} disabled={!linkedinEnabled} onChange={() => setLinkedin(!linkedin)} />
+              LinkedIn{!linkedinEnabled ? ' 🔒' : ''}
+            </label>
           </div>
         </div>
 
@@ -139,6 +145,7 @@ export default function ContentComposer({
                 destinations: {
                   gbp: gbpEnabled && gbp ? true : undefined,
                   meta: socialEnabled && meta.size ? [...meta] : undefined,
+                  linkedin: linkedinEnabled && linkedin ? true : undefined,
                   place: placeFeedEnabled && place ? true : undefined,
                 },
               })

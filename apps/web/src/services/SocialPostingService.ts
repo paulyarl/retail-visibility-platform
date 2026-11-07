@@ -13,6 +13,20 @@ export interface SocialSurface {
   tokenExpired: boolean;
 }
 
+export interface LinkedInSurface {
+  id: string;
+  targetRef: string;
+  displayName: string | null;
+  memberRole: string | null;
+}
+
+export interface LinkedInOrganization {
+  urn: string;
+  id: string;
+  name: string;
+  role: string;
+}
+
 export interface SocialStatus {
   meta: {
     connected: boolean;
@@ -20,6 +34,13 @@ export interface SocialStatus {
     scopesGranted: string[];
     scopesMissing: string[];
     surfaces: Record<string, SocialSurface>;
+  };
+  linkedin?: {
+    connected: boolean;
+    memberName: string | null;
+    reauthorizationRequired: boolean;
+    tokenExpired: boolean;
+    surfaces: Record<string, LinkedInSurface>;
   };
 }
 
@@ -80,6 +101,7 @@ class SocialPostingService extends CustomerApiSingleton {
 
   async createPost(input: {
     platform: string;
+    targetRef?: string;
     body: string;
     linkUrl?: string;
     scheduledFor?: string;
@@ -99,6 +121,33 @@ class SocialPostingService extends CustomerApiSingleton {
 
   async disconnectSurface(id: string): Promise<void> {
     await this.makeDefaultRequest(`/api/customer/marketing/social/meta/surfaces/${id}`, { method: 'DELETE' }, 'social-surface-delete');
+  }
+
+  // ── LinkedIn leg (LINKEDIN_POSTING_SPEC §4.1) ──────────────────────────
+
+  async getLinkedInAuthorizeUrl(): Promise<string> {
+    const result = await this.makeDefaultRequest<any>('/api/customer/marketing/social/linkedin/authorize', {}, 'social-linkedin-authorize');
+    if (!result.success) throw new Error(this.errMsg(result, 'Failed to start LinkedIn connect'));
+    return result.data?.data?.url ?? result.data?.url;
+  }
+
+  async getLinkedInOrganizations(): Promise<{ connected: boolean; organizations: LinkedInOrganization[]; surfaces: LinkedInSurface[] }> {
+    const result = await this.makeDefaultRequest<any>('/api/customer/marketing/social/linkedin/organizations', {}, 'social-linkedin-orgs');
+    if (!result.success) throw new Error(this.errMsg(result, 'Failed to load LinkedIn organizations'));
+    const d = result.data?.data ?? result.data ?? {};
+    return { connected: !!d.connected, organizations: d.organizations ?? [], surfaces: d.surfaces ?? [] };
+  }
+
+  async selectLinkedInSurface(targetRef: string): Promise<void> {
+    const result = await this.makeDefaultRequest<any>('/api/customer/marketing/social/linkedin/select-surface', {
+      method: 'POST',
+      body: JSON.stringify({ targetRef }),
+    }, 'social-linkedin-select');
+    if (!result.success) throw new Error(this.errMsg(result, 'Failed to connect organization page'));
+  }
+
+  async disconnectLinkedInSurface(id: string): Promise<void> {
+    await this.makeDefaultRequest(`/api/customer/marketing/social/linkedin/surfaces/${id}`, { method: 'DELETE' }, 'social-linkedin-surface-delete');
   }
 }
 
