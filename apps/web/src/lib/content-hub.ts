@@ -84,6 +84,20 @@ export function metricSummary(card: ContentChannelCard): string {
   return entries.map(([k, v]) => `${v} ${metricLabel(k)}`).join(' · ');
 }
 
+/** Post-result channel key → display label ("meta:meta_facebook" → "Facebook"). */
+export function channelResultLabel(channel: string): string {
+  const key = channel.startsWith('meta:') ? channel.slice(5) : channel;
+  const labels: Record<string, string> = {
+    gbp: 'Google Business Profile',
+    place: 'Directory listing',
+    linkedin: 'LinkedIn',
+    meta_facebook: 'Facebook',
+    meta_instagram: 'Instagram',
+    meta_threads: 'Threads',
+  };
+  return labels[key] ?? key;
+}
+
 /** Absolute tenant-internal href for a card's editor deep link. */
 export function editorHref(card: ContentChannelCard, tenantId: string): string {
   // '!' prefix = absolute path outside the tenant scope (e.g. the customer-

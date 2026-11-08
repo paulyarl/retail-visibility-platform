@@ -13,7 +13,7 @@ import { contentHubService } from '@/services/ContentHubService';
 import { tenantDirectoryManagementService } from '@/services/TenantDirectoryManagementService';
 import { PlatformHomeSingletonService } from '@/services/PlatformHomeSingletonService';
 import { calculateSEOReadiness, type BusinessProfile } from '@/lib/validation/businessProfile';
-import { topNudge, type ContentSummaryPayload, type QuickLever } from '@/lib/content-hub';
+import { topNudge, channelResultLabel, type ContentSummaryPayload, type QuickLever } from '@/lib/content-hub';
 import ContentChannelCardView from './ContentChannelCardView';
 import ContentComposer from './ContentComposer';
 import ContentAboutEditor from './ContentAboutEditor';
@@ -86,7 +86,12 @@ export default function ContentHubClient({ tenantId }: { tenantId: string }) {
           return;
         }
         setComposerFeedback(
-          res.results.map((r) => (r.ok ? `✓ ${r.channel}${r.scheduled ? ' — scheduled' : ' — published'}` : `✗ ${r.channel} — ${r.error ?? 'failed'}`))
+          res.results.map((r) => {
+            const label = channelResultLabel(r.channel);
+            return r.ok
+              ? `✓ ${label}${r.scheduled ? ' — scheduled' : ' — published'}`
+              : `✗ ${label} — ${r.error ?? 'failed'}`;
+          })
         );
         if (res.posted > 0) {
           const sum = await contentHubService.getSummary(tenantId);
@@ -116,7 +121,10 @@ export default function ContentHubClient({ tenantId }: { tenantId: string }) {
           </div>
           <button
             type="button"
-            onClick={() => setComposerOpen(true)}
+            onClick={() => {
+              setComposerFeedback(null);
+              setComposerOpen(true);
+            }}
             className="bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-xl px-4 py-2"
           >
             + New post
@@ -162,8 +170,14 @@ export default function ContentHubClient({ tenantId }: { tenantId: string }) {
           {leverError}
         </div>
       )}
-      {composerFeedback && (
-        <div className="mb-6 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800 space-y-1">
+      {composerFeedback && !composerOpen && (
+        <div
+          className={`mb-6 rounded-xl border px-4 py-3 text-sm space-y-1 ${
+            composerFeedback.some((l) => l.startsWith('✗'))
+              ? 'border-amber-200 bg-amber-50 text-amber-800'
+              : 'border-emerald-200 bg-emerald-50 text-emerald-800'
+          }`}
+        >
           {composerFeedback.map((line, i) => (
             <p key={i}>{line}</p>
           ))}
@@ -205,6 +219,7 @@ export default function ContentHubClient({ tenantId }: { tenantId: string }) {
           channels={summary.channels}
           placeFeedEnabled={summary.meta?.placeFeed?.enabled ?? false}
           busy={composerBusy}
+          feedback={composerFeedback}
           onClose={() => setComposerOpen(false)}
           onSubmit={submitPost}
         />
