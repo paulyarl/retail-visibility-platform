@@ -53,6 +53,13 @@ export default function DirectoryEntryEditorialLayout(props: DirectoryEntryLayou
     ? (directoryEntryOptions?.whatsappCtaNumber ?? null)
     : null;
 
+  // Claimed seeds carry the same composed description on the listing and the
+  // business profile — render the profile copy only when it adds something.
+  const profileDescription =
+    businessProfile?.business_description || businessProfile?.businessDescription || null;
+  const showProfileDescription =
+    !!profileDescription && profileDescription.trim() !== (listing.description || '').trim();
+
   // Track QR code scans when visitor arrives via QR code
   useQrScanTracking(tenantId, 'directory');
 
@@ -116,7 +123,7 @@ export default function DirectoryEntryEditorialLayout(props: DirectoryEntryLayou
                     )}
                   </div>
                 </div>
-                {isStorefrontEnabled && (
+                {isStorefrontEnabled && (actualProductCount > 0 ? actualProductCount : (listing.productCount ?? 0)) > 0 && (
                   <p className="text-neutral-300 text-lg max-w-2xl leading-relaxed">
                     Browse {actualProductCount > 0 ? actualProductCount : (listing.productCount ?? 0)} products and shop directly from their online storefront.
                   </p>
@@ -159,7 +166,7 @@ export default function DirectoryEntryEditorialLayout(props: DirectoryEntryLayou
                       {listing.description}
                     </p>
                   )}
-                  {(businessProfile?.business_description || businessProfile?.businessDescription) && (
+                  {showProfileDescription && (
                     <p className="text-neutral-600 leading-relaxed text-lg whitespace-pre-wrap">
                       {businessProfile.business_description || businessProfile.businessDescription}
                     </p>

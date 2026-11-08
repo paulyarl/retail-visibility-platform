@@ -139,9 +139,11 @@ export default function DirectoryEntryClassicLayout(props: DirectoryEntryLayoutP
                 {isStorefrontEnabled ? (
                   <div className="px-6 py-8 sm:px-8 sm:py-10 text-center">
                     <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-3">Shop {listing.businessName}</h2>
-                    <p className="text-gray-700 mb-6 text-sm sm:text-base max-w-2xl mx-auto">
-                      Browse {actualProductCount > 0 ? actualProductCount : (listing.productCount ?? 0)} products and shop directly from their online storefront
-                    </p>
+                    {(actualProductCount > 0 ? actualProductCount : (listing.productCount ?? 0)) > 0 && (
+                      <p className="text-gray-700 mb-6 text-sm sm:text-base max-w-2xl mx-auto">
+                        Browse {actualProductCount > 0 ? actualProductCount : (listing.productCount ?? 0)} products and shop directly from their online storefront
+                      </p>
+                    )}
                     <Link href={`${slugForRelated ? `/tenant/${slugForRelated}` : `/tenant/${listing.tenantId}`}`}
                       onClick={trackStorefrontClick}
                       className="inline-flex items-center gap-2 px-8 py-3 text-white rounded-lg transition-colors font-semibold text-lg shadow-md"

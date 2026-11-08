@@ -53,6 +53,13 @@ export default function DirectoryEntryImmersiveLayout(props: DirectoryEntryLayou
     ? (directoryEntryOptions?.whatsappCtaNumber ?? null)
     : null;
 
+  // Claimed seeds carry the same composed description on the listing and the
+  // business profile — render the profile copy only when it adds something.
+  const profileDescription =
+    businessProfile?.business_description || businessProfile?.businessDescription || null;
+  const showProfileDescription =
+    !!profileDescription && profileDescription.trim() !== (listing.description || '').trim();
+
   // Track QR code scans when visitor arrives via QR code
   useQrScanTracking(tenantId, 'directory');
 
@@ -164,7 +171,7 @@ export default function DirectoryEntryImmersiveLayout(props: DirectoryEntryLayou
                   {listing.description && (
                     <p className="text-gray-200 leading-relaxed text-lg mb-3">{listing.description}</p>
                   )}
-                  {(businessProfile?.business_description || businessProfile?.businessDescription) && (
+                  {showProfileDescription && (
                     <p className="text-gray-300 leading-relaxed text-lg whitespace-pre-wrap">{businessProfile.business_description || businessProfile.businessDescription}</p>
                   )}
                 </div>
