@@ -13,57 +13,7 @@ const CACHE_TTL = {
   BUSINESS_HOURS: 30 * 60 * 1000 // 30 minutes
 };
 
-const DAYS = ['monday','tuesday','wednesday','thursday','friday','saturday','sunday'];
-
-function parseProfileHoursToPeriods(hours: any): any[] {
-  if (!hours || typeof hours !== 'object') return [];
-  const fallbackPeriods: any[] = [];
-  for (const day of DAYS) {
-    const h = hours[day];
-    if (h && typeof h === 'object' && !h.closed && h.open && h.close) {
-      fallbackPeriods.push({ day: day.toUpperCase(), open: h.open, close: h.close });
-    } else if (typeof h === 'string' && h.toLowerCase() !== 'closed') {
-      const match = h.match(/(\d{1,2}:\d{2}\s*[AP]M)\s*-\s*(\d{1,2}:\d{2}\s*[AP]M)/i);
-      if (match) {
-        fallbackPeriods.push({ day: day.toUpperCase(), open: match[1].trim(), close: match[2].trim() });
-      }
-    }
-  }
-  return fallbackPeriods;
-}
-
-async function getTenantBusinessHours(tenantId: string): Promise<{ timezone: string; periods: any[] }> {
-  let row = await prisma.business_hours_list.findUnique({ where: { tenant_id: tenantId } });
-  let timezone = row?.timezone || 'America/New_York';
-  let periods: any[] = (row?.periods as any) || [];
-
-  // Fall back to directory listing or business profile hours (e.g. unclaimed
-  // directory seeds) when the canonical business_hours_list has no saved periods.
-  if (periods.length === 0) {
-    const listing = await prisma.directory_listings_list.findFirst({
-      where: { tenant_id: tenantId, listing_origin: 'directory_seed' }
-    });
-    const listingHours = listing?.business_hours as any;
-    if (listingHours && typeof listingHours === 'object') {
-      periods = parseProfileHoursToPeriods(listingHours);
-      timezone = listingHours.timezone || timezone;
-    }
-
-    if (periods.length === 0) {
-      const profile = await prisma.tenant_business_profiles_list.findUnique({
-        where: { tenant_id: tenantId },
-        select: { hours: true },
-      });
-      const profileHours = profile?.hours as any;
-      if (profileHours && typeof profileHours === 'object') {
-        periods = parseProfileHoursToPeriods(profileHours);
-        timezone = profileHours.timezone || timezone;
-      }
-    }
-  }
-
-  return { timezone, periods };
-}
+import { getTenantBusinessHours } from '../utils/business-hours-utils';
 
 const router = Router()
 

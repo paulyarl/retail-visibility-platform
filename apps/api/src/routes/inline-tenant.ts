@@ -75,11 +75,10 @@ router.get('/api/public/tenant/:tenantId/business-hours/status', async (req, res
       return res.json(result);
     }
 
-    const hoursRow = await prisma.business_hours_list.findUnique({
-      where: { tenant_id: tenantId }
-    });
+    const { getTenantBusinessHours } = await import('../utils/business-hours-utils');
+    const { timezone, periods } = await getTenantBusinessHours(tenantId);
 
-    if (!hoursRow) {
+    if (periods.length === 0) {
       const result = {
         success: true,
         data: {
@@ -97,8 +96,7 @@ router.get('/api/public/tenant/:tenantId/business-hours/status', async (req, res
       orderBy: { date: 'asc' }
     });
 
-    const periods = hoursRow.periods as any[] || [];
-    const hours: any = { timezone: hoursRow.timezone };
+    const hours: any = { timezone };
 
     periods.forEach((period: any) => {
       const dayName = period.day?.toLowerCase();
