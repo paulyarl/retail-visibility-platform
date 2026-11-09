@@ -91,6 +91,11 @@ export default function LinkedCampaignsPanel({ seedId, canEdit, seedCategory, se
   const [spawnLinkRole, setSpawnLinkRole] = useState<'primary' | 'sibling' | 'recovery'>('primary');
   const [spawning, setSpawning] = useState(false);
 
+  // Suggested (linkable) campaigns — surfaced proactively so an existing
+  // campaign matching this seed's NAP isn't invisible behind the picker.
+  const [suggestions, setSuggestions] = useState<DirectoryCampaignCandidate[]>([]);
+  const [suggestionsLoading, setSuggestionsLoading] = useState(false);
+
   const fetchLinks = useCallback(async () => {
     try {
       setLoading(true);
@@ -104,9 +109,22 @@ export default function LinkedCampaignsPanel({ seedId, canEdit, seedCategory, se
     }
   }, [seedId]);
 
+  const fetchSuggestions = useCallback(async () => {
+    try {
+      setSuggestionsLoading(true);
+      const data = await directoryPresenceAdminService.findCampaignCandidates(seedId, '', 8);
+      setSuggestions(data.filter((c) => !c.alreadyLinked).slice(0, 5));
+    } catch {
+      setSuggestions([]); // non-fatal — the picker still works
+    } finally {
+      setSuggestionsLoading(false);
+    }
+  }, [seedId]);
+
   useEffect(() => {
     fetchLinks();
-  }, [fetchLinks]);
+    fetchSuggestions();
+  }, [fetchLinks, fetchSuggestions]);
 
   // Deep-link auto-open: when arrived via ?sync=<campaignId>, auto-open the
   // sync modal for that campaign once links are loaded.
@@ -156,6 +174,7 @@ export default function LinkedCampaignsPanel({ seedId, canEdit, seedCategory, se
       );
       setShowPicker(false);
       fetchLinks();
+      fetchSuggestions();
     } catch (err) {
       setActionError(err instanceof Error ? err.message : 'Failed to link campaign');
     } finally {
@@ -398,6 +417,46 @@ export default function LinkedCampaignsPanel({ seedId, canEdit, seedCategory, se
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Suggested campaigns — NAP/name candidates the operator can link in one click */}
+      {canEdit && (suggestionsLoading || suggestions.length > 0) && (
+        <div className="border border-amber-200 bg-amber-50/40 rounded-lg p-3 space-y-2">
+          <p className="text-xs font-semibold text-amber-800 uppercase tracking-wide">
+            Suggested campaigns — matched by business name or city+category
+          </p>
+          {suggestionsLoading ? (
+            <p className="text-xs text-amber-700">Checking for linkable campaigns…</p>
+          ) : (
+            suggestions.map((c) => (
+              <div
+                key={c.id}
+                className="flex items-center justify-between gap-3 bg-white border border-gray-200 rounded-lg p-3"
+              >
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-gray-900 truncate">
+                    {c.businessName || c.id}
+                  </p>
+                  <p className="text-xs text-gray-500">
+                    {c.category} · {c.city}
+                    {c.state ? `, ${c.state}` : ''} · stage: {c.stage}
+                    {c.playbookCode ? ` · ${c.playbookCode}` : ''}
+                    {c.playbookName ? ` — ${c.playbookName}` : ''}
+                  </p>
+                </div>
+                <button
+                  onClick={() => handleLink(c.id)}
+                  disabled={linkingCampaignId === c.id}
+                  className="inline-flex items-center gap-1 text-xs font-medium text-blue-600 hover:text-blue-800 px-2 py-1 rounded border border-blue-200 hover:bg-blue-50 disabled:opacity-50 shrink-0"
+                  title={`Link as ${linkRole} — high-confidence NAP auto-projects signals`}
+                >
+                  <Link2 className="w-3 h-3" />
+                  {linkingCampaignId === c.id ? 'Linking…' : `Link as ${linkRole}`}
+                </button>
+              </div>
+            ))
+          )}
         </div>
       )}
 
