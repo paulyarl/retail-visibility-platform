@@ -12,8 +12,15 @@ interface LayoutProps {
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
   const { slug } = await params;
 
+  const data = await directoryService.getDirectoryConsolidated(slug);
+  // A null result or {success:false} ApiResult means the fetch failed —
+  // emitting "Place Not Found" for a transport blip would be a soft-404.
+  // Throw to the error boundary (retryable 5xx) instead.
+  if (!data || (data as any).success === false) {
+    throw new Error(`Place metadata fetch failed for slug "${slug}"`);
+  }
+
   try {
-    const data = await directoryService.getDirectoryConsolidated(slug);
     const listing = data?.listing;
 
     if (!listing) {
