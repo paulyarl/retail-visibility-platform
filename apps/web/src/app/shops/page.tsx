@@ -1,6 +1,7 @@
 import { Metadata } from 'next';
 import { Suspense } from 'react';
 import ShopsPageClient from './ShopsPageClient';
+import { platformOrigin } from '@/lib/storefront-routing';
 import { PageProps } from './types';
 
 export default async function ShopsPage({ params, searchParams }: PageProps) {
@@ -29,5 +30,6 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   return {
     title: 'Shops Directory',
     description: 'Browse shops and products in our directory',
+    alternates: { canonical: `${platformOrigin()}/shops` },
   };
 }

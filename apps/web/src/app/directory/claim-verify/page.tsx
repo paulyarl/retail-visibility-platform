@@ -7,6 +7,7 @@ export const dynamic = 'force-dynamic';
 export const metadata: Metadata = {
   title: 'Confirm Claim Request — VisibleShelf Directory',
   description: 'Confirm your email to submit your directory listing claim for review.',
+  robots: { index: false, follow: false },
 };
 
 export default function VerifyClaimPage() {

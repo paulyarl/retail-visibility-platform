@@ -7,6 +7,7 @@ export const dynamic = 'force-dynamic';
 export const metadata: Metadata = {
   title: 'Verify Business Submission — VisibleShelf Directory',
   description: 'Confirm your business submission email to complete the process.',
+  robots: { index: false, follow: false },
 };
 
 export default function VerifyBusinessPage() {

@@ -1,5 +1,6 @@
 import { Suspense } from 'react';
 import type { Metadata } from 'next';
+import { platformOrigin } from '@/lib/storefront-routing';
 import { platformSettingsService } from '@/services/PlatformSettingsSingletonService';
 import { resolveDirectoryLayout, type DirectoryLayoutKey } from '@/components/directory/redesign/types';
 import DirectoryShell from '@/components/directory/redesign/layouts/DirectoryShell';
@@ -10,6 +11,7 @@ export const metadata: Metadata = {
   title: 'VisibleShelf Directory - Find Local Stores & Products',
   description:
     'Discover local businesses and their products in the VisibleShelf directory. Browse stores by category, location, and store type.',
+  alternates: { canonical: `${platformOrigin()}/directory` },
   openGraph: {
     title: 'VisibleShelf Directory - Find Local Stores & Products',
     description:

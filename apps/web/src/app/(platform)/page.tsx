@@ -1,7 +1,15 @@
 import { cookies } from 'next/headers';
+import type { Metadata } from 'next';
 import { LandingHero } from '@/components/landing/LandingHero';
+import { platformOrigin } from '@/lib/storefront-routing';
 import PlatformSummaryBand from './PlatformSummaryBand';
 import PlatformHomeClient from './PlatformHomeClient';
+
+export const metadata: Metadata = {
+  // Self-canonical — the apex is the canonical host (www 301s here), so any
+  // ?utm/tracked variant consolidates instead of reporting as a duplicate.
+  alternates: { canonical: `${platformOrigin()}/` },
+};
 
 /**
  * Platform root — server component.

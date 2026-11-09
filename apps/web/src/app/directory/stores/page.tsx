@@ -1,5 +1,6 @@
 import { Suspense } from 'react';
 import type { Metadata } from 'next';
+import { platformOrigin } from '@/lib/storefront-routing';
 import AllStoreTypesClient from './AllStoreTypesClient';
 import { PoweredByFooter } from '@/components/PoweredByFooter';
 
@@ -9,6 +10,7 @@ export const metadata: Metadata = {
   title: 'Store Types - VisibleShelf Directory',
   description:
     'Browse local stores by type on VisibleShelf. Find retail shops, services, restaurants, and more near you.',
+  alternates: { canonical: `${platformOrigin()}/directory/stores` },
   openGraph: {
     title: 'Store Types - VisibleShelf Directory',
     description: 'Browse local stores by type on VisibleShelf.',

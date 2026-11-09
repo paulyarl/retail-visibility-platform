@@ -7,6 +7,7 @@ import PlaceNationalPanel from './PlaceNationalPanel';
 import PlacesIndexDirectory, { type PlacesIndexCityLink } from './PlacesIndexDirectory';
 import { PoweredByFooter } from '@/components/PoweredByFooter';
 import { getPlaceCityShelfUrl } from '@/utils/slug';
+import { platformOrigin } from '@/lib/storefront-routing';
 
 export const dynamic = 'force-dynamic';
 
@@ -26,6 +27,7 @@ export async function generateMetadata(): Promise<Metadata> {
   return {
     title,
     description,
+    alternates: { canonical: `${platformOrigin()}/place` },
     openGraph: {
       title,
       description,

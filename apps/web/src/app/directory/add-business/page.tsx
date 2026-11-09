@@ -1,5 +1,6 @@
 import { Suspense } from 'react';
 import type { Metadata } from 'next';
+import { platformOrigin } from '@/lib/storefront-routing';
 import AddBusinessClient from './AddBusinessClient';
 
 export const dynamic = 'force-dynamic';
@@ -8,6 +9,7 @@ export const metadata: Metadata = {
   title: 'Add Your Business — VisibleShelf Directory',
   description:
     'Add your local business to the VisibleShelf directory. Our team reviews every submission before publishing.',
+  alternates: { canonical: `${platformOrigin()}/directory/add-business` },
   openGraph: {
     title: 'Add Your Business — VisibleShelf Directory',
     description: 'Add your local business to the VisibleShelf directory.',

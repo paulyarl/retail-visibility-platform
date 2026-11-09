@@ -1693,14 +1693,18 @@ async function loadPlacesEntries(pool: any, baseUrl: string) {
   );
 
   // Markets — the canonical "/place/city/{city}-{state}" slug disambiguates
-  // same-name cities across states.
+  // same-name cities across states. The shelf page noindexes itself below 3
+  // listings (generateMetadata `total >= 3` gate), and a sitemap must only
+  // list indexable URLs — so the count here uses the PAGE's predicate (all
+  // published seeds, not just publishable) with the same >= 3 floor.
   const citiesResult = await pool.query(
-    `SELECT DISTINCT LOWER(dps.city) AS city_slug, LOWER(dps.state) AS state_slug
+    `SELECT LOWER(dps.city) AS city_slug, LOWER(dps.state) AS state_slug
      FROM directory_presence_seeds dps
      JOIN directory_listings_list dll ON dll.id = dps.listing_id
      WHERE dps.status IN ('published', 'invited', 'claimed') AND dll.is_published = true
        AND dll.listing_origin = 'directory_seed'
-       AND ${publishable}
+     GROUP BY city_slug, state_slug
+     HAVING COUNT(*) >= 3
      ORDER BY city_slug, state_slug`,
   );
 

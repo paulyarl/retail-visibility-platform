@@ -4,11 +4,14 @@ import PlacesSearchHero from './PlacesSearchHero';
 import AddBusinessCta from '@/components/directory/AddBusinessCta';
 import SuggestBusinessCta from '@/components/directory/SuggestBusinessCta';
 import { PoweredByFooter } from '@/components/PoweredByFooter';
+import { platformOrigin } from '@/lib/storefront-routing';
 import { Metadata } from 'next';
 
 export const metadata: Metadata = {
   title: 'Search Places — Directory',
   description: 'Search for businesses across all cities and categories.',
+  // Bare search page is a browse surface; ?q= variants canonicalize here.
+  alternates: { canonical: `${platformOrigin()}/place/search` },
 };
 
 export default function PlacesSearchPage() {

@@ -16,6 +16,8 @@ import LocationBrowseTracker from '@/components/tracking/LocationBrowseTracker';
 import { stripStaleBusinessCount } from '@/lib/strip-stale-business-count';
 import { resolveDirectoryShelfForLabel, directoryShelfHrefFor, type DirectoryShelfIndexEntry } from '@/lib/directory-shelves';
 import { clientLogger } from '@/lib/client-logger';
+import { platformOrigin } from '@/lib/storefront-routing';
+import { getPlaceCityShelfUrl } from '@/utils/slug';
 
 interface LocationPageProps {
   params: Promise<{
@@ -90,6 +92,20 @@ export async function generateMetadata({ params }: LocationPageProps): Promise<M
   const locationName = formatLocation(parsed.city, parsed.state);
   const enrichment = await placesBrowsePublicService.getLocationEnrichment(parsed.city, parsed.state);
 
+  // This is the legacy tenant-listings-by-location page; the canonical market
+  // shelf lives at /place/city/{city}-{state}. Consolidate there — but only
+  // when that shelf is itself indexable (>= 3 listings; below that it emits
+  // noindex, and canonicalizing to a noindexed URL loses the consolidation).
+  // Otherwise self-canonicalize so variants still fold into one URL.
+  const shelfHref = getPlaceCityShelfUrl(parsed.city, parsed.state);
+  const shelfSlug = shelfHref.split('/').pop();
+  const shelfSummary = shelfSlug
+    ? await placesBrowsePublicService.getCityShelfSummary(shelfSlug).catch(() => null)
+    : null;
+  const canonical = (shelfSummary?.total ?? 0) >= 3
+    ? `${platformOrigin()}${shelfHref}`
+    : `${platformOrigin()}/directory/location/${location}`;
+
   // Legacy packets bake a listing count that goes stale ("0 Businesses in …") —
   // normalize so the SERP never carries a count that can't reflect actual.
   const title = stripStaleBusinessCount(enrichment?.effective?.metaTitle)
@@ -102,6 +118,7 @@ export async function generateMetadata({ params }: LocationPageProps): Promise<M
     title,
     description,
     keywords,
+    alternates: { canonical },
     openGraph: {
       title,
       description,

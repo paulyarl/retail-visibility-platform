@@ -3,6 +3,7 @@ import type { Metadata } from 'next';
 import CategoryViewClient from './CategoryViewClient';
 import placesBrowsePublicService from '@/services/PlacesBrowsePublicService';
 import marketIntelSurfaceService from '@/services/MarketIntelSurfaceService';
+import { platformOrigin } from '@/lib/storefront-routing';
 
 export const dynamic = 'force-dynamic';
 
@@ -24,11 +25,16 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   // '__all__' enrichment packet written by a national directory_enrichment
   // campaign. Falls back to a default title when no packet exists.
   const enrichment = await placesBrowsePublicService.getCategoryEnrichment(categorySlug, '__all__');
+  // Legacy duplicate of /place/category/{slug} — same national shelf and the
+  // same '__all__' packet — so it consolidates there, not self-canonicals
+  // (canonicalize, not redirect: tenant links may still land here).
+  const canonical = `${platformOrigin()}/place/category/${categorySlug}`;
   if (enrichment?.market) {
     return {
       title: enrichment.effective.metaTitle,
       description: enrichment.effective.description,
       keywords: enrichment.effective.keywords,
+      alternates: { canonical },
       openGraph: {
         title: enrichment.effective.metaTitle,
         description: enrichment.effective.description,
@@ -44,6 +50,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   return {
     title: `${categoryName} — Directory — VisibleShelf`,
     description: `Browse ${categoryName} businesses listed on VisibleShelf.`,
+    alternates: { canonical },
   };
 }
 

@@ -1,5 +1,6 @@
 import { Suspense } from 'react';
 import type { Metadata } from 'next';
+import { platformOrigin } from '@/lib/storefront-routing';
 import placesBrowsePublicService from '@/services/PlacesBrowsePublicService';
 import AllCategoriesClient from './AllCategoriesClient';
 import { PoweredByFooter } from '@/components/PoweredByFooter';
@@ -10,6 +11,7 @@ export const metadata: Metadata = {
   title: 'Categories - VisibleShelf Directory',
   description:
     'Browse local businesses by category on VisibleShelf. Find stores, services, restaurants, and more in your community.',
+  alternates: { canonical: `${platformOrigin()}/directory/categories` },
   openGraph: {
     title: 'Categories - VisibleShelf Directory',
     description: 'Browse local businesses by category on VisibleShelf.',

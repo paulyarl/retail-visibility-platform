@@ -1,5 +1,6 @@
 import { Suspense } from 'react';
 import type { Metadata } from 'next';
+import { platformOrigin } from '@/lib/storefront-routing';
 import SuggestBusinessClient from './SuggestBusinessClient';
 
 export const dynamic = 'force-dynamic';
@@ -8,6 +9,7 @@ export const metadata: Metadata = {
   title: 'Suggest a Business — VisibleShelf Directory',
   description:
     'Suggest a local business to add to the VisibleShelf directory. Our team reviews every submission.',
+  alternates: { canonical: `${platformOrigin()}/directory/suggest` },
   openGraph: {
     title: 'Suggest a Business — VisibleShelf Directory',
     description: 'Suggest a local business to add to the VisibleShelf directory.',

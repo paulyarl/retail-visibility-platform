@@ -6,6 +6,7 @@ import { DirectoryGrid } from '@/components/directory/DirectoryGrid';
 import { BreadcrumbStructuredData } from '@/components/directory/StructuredData';
 import { recommendationsService } from '@/services/RecommendationsSingletonService';
 import { clientLogger } from '@/lib/client-logger';
+import { platformOrigin } from '@/lib/storefront-routing';
 
 interface CategoryPageProps {
   params: Promise<{
@@ -97,6 +98,9 @@ export async function generateMetadata({ params }: CategoryPageProps): Promise<M
   return {
     title,
     description,
+    // Tenant-category surface (CATEGORY_INFO, claimed tenants) — no /place
+    // shelf equivalent, so it self-canonicalizes; ?page= variants fold here.
+    alternates: { canonical: `${platformOrigin()}/directory/category/${category}` },
     openGraph: {
       title,
       description,

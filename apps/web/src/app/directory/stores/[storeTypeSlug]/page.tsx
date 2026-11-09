@@ -1,4 +1,5 @@
 import { Metadata } from 'next';
+import { platformOrigin } from '@/lib/storefront-routing';
 import StoreTypeViewClient from './StoreTypeViewClient';
 
 interface PageProps {
@@ -25,6 +26,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   return {
     title: `${title} | Store Directory`,
     description: `Browse ${title.toLowerCase()} in your area. Find local stores and discover their products.`,
+    alternates: { canonical: `${platformOrigin()}/directory/stores/${resolvedParams.storeTypeSlug}` },
   };
 }
 
