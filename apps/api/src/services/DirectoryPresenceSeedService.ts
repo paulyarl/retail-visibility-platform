@@ -2009,9 +2009,20 @@ class DirectoryPresenceSeedService {
 
     // Upsert provenance rows — caller-supplied first, then the auto rows for
     // changed identity/category fields the caller didn't already cover.
-    const providedKeys = new Set((provenanceUpdates ?? []).map((p) => p.fieldKey));
+    // A caller row only covers a changed field when it asserts the NEW value;
+    // the form echoes the whole existing ledger back, and an untouched stale
+    // row must not suppress the operator_override stamp the change earned.
+    const autoValueByKey = new Map(
+      autoProvenance.map((p) => [p.fieldKey, p.value == null ? null : String(p.value)]),
+    );
+    const callerRows = (provenanceUpdates ?? []).filter((p) => {
+      const autoValue = autoValueByKey.get(p.fieldKey);
+      if (autoValue === undefined) return true; // field not changed — caller row stands
+      return (p.value == null ? null : String(p.value)) === autoValue;
+    });
+    const providedKeys = new Set(callerRows.map((p) => p.fieldKey));
     const mergedProvenance = [
-      ...(provenanceUpdates ?? []),
+      ...callerRows,
       ...autoProvenance.filter((p) => !providedKeys.has(p.fieldKey)),
     ];
     if (mergedProvenance.length > 0) {
