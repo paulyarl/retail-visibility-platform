@@ -134,6 +134,44 @@ const lit = (s) => `'${String(s).replace(/'/g, "''")}'`;
   if (missing.length) console.log(`referenced campaigns not found locally (will NULL on import): ${missing.join(', ')}`);
   console.log(`referenced campaigns: ${campaigns.length}`);
 
+  // ── intelligence profiles for the market's category set ────────────────
+  // The profile row is self-contained at read time (enrichment reads
+  // configuration_json — synonyms/subcategories/prohibited_keywords/
+  // schema_org_type — and never reaches back into the scan corpus that
+  // built it), so it transports standalone. Exports every version row
+  // keyed to the market's categories, filtered to the market's geos plus
+  // state/nationwide fallbacks. --no-profiles opts out.
+  const NO_PROFILES = args.includes('--no-profiles');
+  const categoryKeys = new Set();
+  const addKey = (s) => {
+    const k = (typeof s === 'string' ? s : s?.category || '')
+      .trim().toLowerCase().replace(/[_-]+/g, ' ').replace(/\s+/g, ' ');
+    if (k) categoryKeys.add(k);
+  };
+  const geoCities = new Set([campaign?.city, ...queue.map((r) => r.city)].filter(Boolean).map((s) => s.toLowerCase()));
+  const geoStates = new Set([state, ...queue.map((r) => r.state)].filter(Boolean).map((s) => s.toLowerCase()));
+  addKey(CATEGORY || campaign?.category);
+  for (const r of queue) {
+    addKey(r.category);
+    const sc = r.business_snapshot?.secondary_categories;
+    if (Array.isArray(sc)) for (const s of sc) addKey(s);
+  }
+  let profiles = [];
+  if (!NO_PROFILES && categoryKeys.size) {
+    const all = await q(
+      `SELECT * FROM mkt_intelligence_profiles WHERE category_key IN (${[...categoryKeys].map(lit).join(',')}) ORDER BY category_key, intelligence_focus, reference_city, version`,
+    );
+    profiles = all.filter((p) => {
+      const c = (p.reference_city || '').toLowerCase();
+      const s = (p.reference_state || '').toLowerCase();
+      // 'all' is the legacy nationwide sentinel alongside NULL.
+      return (!c || c === 'all' || geoCities.has(c)) && (!s || s === 'all' || geoStates.has(s));
+    });
+    const byFocus = {};
+    for (const p of profiles) byFocus[`${p.intelligence_focus || '?'}/${p.status}`] = (byFocus[`${p.intelligence_focus || '?'}/${p.status}`] || 0) + 1;
+    console.log(`profiles: ${profiles.length} version rows  ${JSON.stringify(byFocus)}`);
+  }
+
   // ── write ──────────────────────────────────────────────────────────────
   const payload = {
     meta: {
@@ -147,12 +185,14 @@ const lit = (s) => `'${String(s).replace(/'/g, "''")}'`;
         refCampaigns: campaigns.length,
         audits: audits.length,
         queue: queue.length,
+        profiles: profiles.length,
       },
     },
     campaign,
     refCampaigns: campaigns,
     audits,
     queue,
+    profiles,
   };
   const json = JSON.stringify(payload, null, 2);
   const outFile =
