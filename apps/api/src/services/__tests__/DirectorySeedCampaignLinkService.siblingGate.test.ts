@@ -162,4 +162,36 @@ describe('linkCampaign — primary link guard', () => {
     expect(mockExecuteRaw).toHaveBeenCalled();
     expect(res.link.campaignId).toBe('camp-legacy');
   });
+
+  it('lets a business-scope campaign supersede a non-business primary', async () => {
+    // The market/category scan that found the seed holds primary; the
+    // spawned business campaign should take it, demoting the incumbent to
+    // sibling rather than hard-failing with primary_link_already_exists.
+    setupDb({
+      campaign: LEGACY_CAMPAIGN,
+      existingPrimary: [{ id: 'dscl-old', scope: 'category' }],
+    });
+
+    const res = await DirectorySeedCampaignLinkService.linkCampaign(
+      'seed-1',
+      'camp-legacy',
+      'primary',
+    );
+
+    expect(mockExecuteRaw).toHaveBeenCalled();
+    expect(res.link.campaignId).toBe('camp-legacy');
+  });
+
+  it('still conflicts when the incumbent primary is business-scope', async () => {
+    setupDb({
+      campaign: LEGACY_CAMPAIGN,
+      existingPrimary: [{ id: 'dscl-old', scope: 'business' }],
+    });
+
+    await expect(
+      DirectorySeedCampaignLinkService.linkCampaign('seed-1', 'camp-legacy', 'primary'),
+    ).rejects.toThrow('primary_link_already_exists');
+
+    expect(mockExecuteRaw).not.toHaveBeenCalled();
+  });
 });
