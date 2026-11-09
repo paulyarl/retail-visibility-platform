@@ -82,13 +82,18 @@ import { useDirectoryCategories } from '@/hooks/directory/useDirectoryCategories
 const PROVENANCE_FIELD_KEYS = [
   'name',
   'address',
+  'city',
+  'state',
+  'zip_code',
   'phone',
+  'email',
   'snap_ebt',
   'hours',
   'specialty_line',
   'description',
   'keywords',
   'same_as',
+  'primary_category',
   'secondary_categories',
   'attributes',
 ] as const;
@@ -1442,8 +1447,11 @@ function PresenceSeedDetailClient() {
     let zip = listing?.zip_code ?? '';
     if (rawAddress && addressParser.canParse(rawAddress)) {
       const parsed = addressParser.parse(rawAddress);
+      // postal_code alone isn't proof — the parser emits "711" as a zip for
+      // "711 E Thompson Rd, Suite B". Require a real 5-digit ZIP or a
+      // city+state pair, else it's street+secondary and must not split.
       const looksLikeFullAddress =
-        !!parsed.postal_code ||
+        (!!parsed.postal_code && /^\d{5}(-\d{4})?$/.test(parsed.postal_code)) ||
         !!(parsed.city && parsed.state && US_STATES.includes(parsed.state));
       if (looksLikeFullAddress) {
         street =
@@ -4767,6 +4775,10 @@ function PresenceSeedDetailClient() {
                         updateEditProvenanceRow(idx, { fieldKey: e.target.value })
                       }
                     >
+                      {row.fieldKey &&
+                        !(PROVENANCE_FIELD_KEYS as readonly string[]).includes(row.fieldKey) && (
+                          <option value={row.fieldKey}>{row.fieldKey}</option>
+                        )}
                       {PROVENANCE_FIELD_KEYS.map((k) => (
                         <option key={k} value={k}>{k}</option>
                       ))}
