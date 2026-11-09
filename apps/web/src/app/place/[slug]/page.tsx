@@ -74,17 +74,33 @@ export default async function PlacePage({ params, searchParams }: PlacePageProps
     ? resolvedSearchParams.shelf[0]
     : resolvedSearchParams?.shelf;
 
-  let listing: any = null;
-  try {
-    const data = await directoryService.getDirectoryConsolidated(slug);
-    listing = data?.listing ?? null;
-  } catch (error) {
-    clientLogger.error('[Place] Error fetching place data:', { detail: error });
-  }
+  // The consolidated API returns success:true + listing:null for a genuine
+  // miss, while makeDefaultRequest collapses transport failures into a
+  // {success:false} ApiResult. A failed fetch must not render as a 404 —
+  // crawlers would read a transient API blip as a dead page (soft-404).
+  const fetchListing = async (): Promise<{ listing: any; failed: boolean }> => {
+    try {
+      const data = await directoryService.getDirectoryConsolidated(slug);
+      // null (service-caught exception) or a {success:false} ApiResult both
+      // mean the fetch failed — only a real payload can prove a miss.
+      if (!data || (data as any).success === false) return { listing: null, failed: true };
+      return { listing: data?.listing ?? null, failed: false };
+    } catch (error) {
+      clientLogger.error('[Place] Error fetching place data:', { detail: error });
+      return { listing: null, failed: true };
+    }
+  };
 
-  if (!listing) {
+  let fetchResult = await fetchListing();
+  if (fetchResult.failed) fetchResult = await fetchListing(); // one retry on failure
+
+  if (!fetchResult.listing) {
+    // Still failing after retry → surface a retryable 5xx via the error
+    // boundary instead of a soft-404.
+    if (fetchResult.failed) throw new Error(`Place fetch failed for slug "${slug}"`);
     notFound();
   }
+  const listing = fetchResult.listing;
 
   // Suppressed seeds are hidden from shoppers even when the underlying
   // listing row is still published. The consolidated API filters them too;
