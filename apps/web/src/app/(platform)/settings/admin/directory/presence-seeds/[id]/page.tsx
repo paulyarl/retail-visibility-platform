@@ -1369,21 +1369,24 @@ function PresenceSeedDetailClient() {
   // 64124") splits into its fields — same behavior as the Create Seed
   // form + Verify record modal. Suite/unit stays on the street line;
   // parsed components fill their fields when present.
-  const handleEditAddressChange = (value: string) => {
-    if (addressParser.canParse(value)) {
-      const parsed = addressParser.parse(value);
-      setEditAddress(
-        [parsed.address_line1, parsed.address_line2].filter(Boolean).join(', ') ||
-          value,
-      );
-      setEditCity((prev) => parsed.city ?? prev);
-      setEditState((prev) =>
-        parsed.state && US_STATES.includes(parsed.state) ? parsed.state : prev,
-      );
-      setEditZipCode((prev) => parsed.postal_code ?? prev);
-    } else {
-      setEditAddress(value);
-    }
+  // The parser exists to split a PASTED full address into the fields —
+  // running it on every keystroke mangles partial input (a comma typed
+  // mid-edit, e.g. "711 E Thompson Rd," before ", Suite B", parses wrong
+  // and scatters the pieces). Paste-only split keeps typing plain.
+  const handleEditAddressPaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
+    const pasted = e.clipboardData?.getData('text') ?? '';
+    if (!pasted || !addressParser.canParse(pasted)) return;
+    e.preventDefault();
+    const parsed = addressParser.parse(pasted);
+    setEditAddress(
+      [parsed.address_line1, parsed.address_line2].filter(Boolean).join(', ') ||
+        pasted,
+    );
+    setEditCity((prev) => parsed.city ?? prev);
+    setEditState((prev) =>
+      parsed.state && US_STATES.includes(parsed.state) ? parsed.state : prev,
+    );
+    setEditZipCode((prev) => parsed.postal_code ?? prev);
   };
 
   const handleGetCoordinates = async () => {
@@ -4289,7 +4292,8 @@ function PresenceSeedDetailClient() {
                 <input
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
                   value={editAddress}
-                  onChange={(e) => handleEditAddressChange(e.target.value)}
+                  onChange={(e) => setEditAddress(e.target.value)}
+                  onPaste={handleEditAddressPaste}
                   placeholder="123 Main St — paste a full address to split city/state/ZIP"
                 />
               </div>
