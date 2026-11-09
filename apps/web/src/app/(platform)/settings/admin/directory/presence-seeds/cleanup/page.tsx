@@ -547,6 +547,10 @@ function CleanupContent() {
     [report],
   );
   const thinSeeds = report?.completeness.thinSeeds ?? [];
+  const [thinStatusFilter, setThinStatusFilter] = useState<'all' | 'draft' | 'published'>('all');
+  const visibleThinSeeds = thinStatusFilter === 'all'
+    ? thinSeeds
+    : thinSeeds.filter((s) => s.status === thinStatusFilter);
 
   const runAction = async (fn: () => Promise<string>) => {
     setBusy(true);
@@ -630,7 +634,7 @@ function CleanupContent() {
 
   const handleBackfillAll = () =>
     runAction(async () => {
-      const ids = thinSeeds
+      const ids = visibleThinSeeds
         .filter((s) => s.status !== 'claimed' && s.status !== 'suppressed')
         .map((s) => s.seedId);
       if (ids.length === 0) return 'No live thin seeds to backfill.';
@@ -652,7 +656,7 @@ function CleanupContent() {
    */
   const handleRecomposeAll = () =>
     runAction(async () => {
-      const ids = thinSeeds
+      const ids = visibleThinSeeds
         .filter((s) => s.status !== 'claimed' && s.status !== 'suppressed')
         .map((s) => s.seedId);
       if (ids.length === 0) return 'No live seeds to recompose.';
@@ -822,10 +826,26 @@ function CleanupContent() {
             <span className="text-xs text-gray-500">
               {loading
                 ? '…'
-                : `${thinSeeds.length} of ${report?.completeness.totalSeeds ?? 0} seeds missing fields`}
+                : `${visibleThinSeeds.length} of ${report?.completeness.totalSeeds ?? 0} seeds missing fields`}
             </span>
+            <div className="flex items-center gap-1 ml-2">
+              {(['all', 'draft', 'published'] as const).map((f) => (
+                <button
+                  key={f}
+                  type="button"
+                  onClick={() => setThinStatusFilter(f)}
+                  className={`px-2 py-0.5 text-xs rounded-full border ${
+                    thinStatusFilter === f
+                      ? 'bg-gray-800 text-white border-gray-800 dark:bg-gray-200 dark:text-gray-900'
+                      : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50 dark:bg-neutral-800 dark:text-gray-300 dark:border-neutral-600'
+                  }`}
+                >
+                  {f === 'all' ? 'All' : f === 'draft' ? 'Drafts' : 'Published'}
+                </button>
+              ))}
+            </div>
           </div>
-          {thinSeeds.length > 0 && (<>
+          {visibleThinSeeds.length > 0 && (<>
             <button
               type="button"
               onClick={handleBackfillAll}
@@ -847,13 +867,13 @@ function CleanupContent() {
           </>)}
         </div>
 
-        {!loading && thinSeeds.length === 0 && (
+        {!loading && visibleThinSeeds.length === 0 && (
           <div className="rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700 dark:border-green-900/50 dark:bg-green-950/30 dark:text-green-300">
             Every live seed carries its full contract fields.
           </div>
         )}
 
-        {thinSeeds.length > 0 && (
+        {visibleThinSeeds.length > 0 && (
           <div className="overflow-hidden rounded-xl border border-gray-200 dark:border-neutral-700">
             <table className="w-full text-sm">
               <thead className="bg-gray-50 text-left text-xs uppercase tracking-wide text-gray-500 dark:bg-neutral-800 dark:text-gray-400">
@@ -864,7 +884,7 @@ function CleanupContent() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100 dark:divide-neutral-800">
-                {thinSeeds.map((s) => (
+                {visibleThinSeeds.map((s) => (
                   <tr key={s.seedId} className="bg-white dark:bg-neutral-900">
                     <td className="px-4 py-2">
                       <div className="flex items-center gap-2">

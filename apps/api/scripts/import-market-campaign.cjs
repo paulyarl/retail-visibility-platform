@@ -75,10 +75,10 @@ const val = (v, udt) => {
   return lit(v);
 };
 
-const insertSql = (table, row) => {
+const insertSql = (table, row, conflict = 'id') => {
   const cols = Object.keys(row);
   const types = colTypes[table] || {};
-  return `INSERT INTO ${table} (${cols.join(',')}) VALUES (${cols.map((c) => val(row[c], types[c])).join(',')}) ON CONFLICT (id) DO NOTHING`;
+  return `INSERT INTO ${table} (${cols.join(',')}) VALUES (${cols.map((c) => val(row[c], types[c])).join(',')}) ON CONFLICT (${conflict}) DO NOTHING`;
 };
 
 (async () => {
@@ -87,7 +87,7 @@ const insertSql = (table, row) => {
     process.exit(1);
   }
   const payload = JSON.parse(fs.readFileSync(path.resolve(FILE), 'utf8'));
-  const { campaign, refCampaigns = [], audits = [], queue = [], meta = {} } = payload;
+  const { campaign, refCampaigns = [], audits = [], queue = [], profiles = [], meta = {} } = payload;
   console.log(`import file: ${FILE}`);
   console.log(`meta:`, JSON.stringify(meta.counts || {}), meta.exportedAt || '');
 
@@ -170,10 +170,46 @@ const insertSql = (table, row) => {
     (r) => !(r.status === 'queued' && r.business_name && r.city && dupKeys.has(dupKey(r))),
   );
 
+  // Profiles: PK is (id, version), so ON CONFLICT (id) can't skip — but the
+  // bigger hazard is idx_mkt_intel_profiles_active_scope: an exported
+  // 'active' profile whose (category_key, focus, ref city/state/platform)
+  // scope is already claimed by a DIFFERENT active profile on the target
+  // would throw mid-insert. Skip + report; the target's profile wins and
+  // reconciliation is a human call.
+  const scopeKey = (r) =>
+    `${(r.category_key || '').toLowerCase()}|${(r.intelligence_focus || '').toLowerCase()}|${(r.reference_city || '').toLowerCase()}|${(r.reference_state || '').toLowerCase()}|${(r.reference_platform || '').toLowerCase()}`;
+  const claimedScopes = new Set(
+    profiles.some((p) => p.status === 'active')
+      ? (
+          await q(
+            `SELECT category_key, intelligence_focus, reference_city, reference_state, reference_platform, id
+             FROM mkt_intelligence_profiles WHERE status = 'active'`,
+          )
+        ).map((r) => `${scopeKey(r)}|${r.id}`)
+      : [],
+  );
+  const takenScopes = new Set([...claimedScopes].map((k) => k.slice(0, k.lastIndexOf('|'))));
+  const scopeConflicts = profiles.filter(
+    (p) => p.status === 'active' && takenScopes.has(scopeKey(p)) && !claimedScopes.has(`${scopeKey(p)}|${p.id}`),
+  );
+  const conflictKeys = new Set(scopeConflicts.map((p) => `${p.id}:${p.version}`));
+  const insertProfiles = profiles.filter((p) => !conflictKeys.has(`${p.id}:${p.version}`));
+  const preP = profiles.length
+    ? (
+        await q(
+          `SELECT id, version FROM mkt_intelligence_profiles WHERE (id, version) IN (${profiles
+            .map((p) => `(${lit(p.id)},${Number(p.version) || 0})`)
+            .join(',')})`,
+        )
+      ).length
+    : 0;
+
   console.log('\nplan:');
   console.log(`  campaigns:  ${cleanCampaigns.length} to insert, ${preC} already exist`);
   console.log(`  audits:     ${cleanAudits.length} to insert, ${preA} already exist, ${skippedAudits.length} skipped (dangling campaign_id)`);
   console.log(`  queue:      ${insertQueue.length} to insert, ${preQ} already exist, ${dupQueue.length} dup-active (skipped)`);
+  if (profiles.length)
+    console.log(`  profiles:   ${insertProfiles.length} to insert, ${preP} already exist, ${scopeConflicts.length} scope-conflict (skipped)`);
   const nulled = cleanQueue.filter((r, i) => r.source_campaign_id !== queue[i].source_campaign_id || r.processed_campaign_id !== queue[i].processed_campaign_id);
   if (nulled.length) console.log(`  queue rows with campaign refs NULLed (not on target): ${nulled.length}`);
   if (skippedAudits.length) console.log(`  skipped audit ids: ${skippedAudits.join(', ')}`);
@@ -212,6 +248,19 @@ const insertSql = (table, row) => {
       n += (await client.query(insertSql('mkt_campaigns_list', c))).rowCount;
     }
     console.log(`  inserted ${n} campaigns`);
+    if (insertProfiles.length) {
+      await loadColTypes('mkt_intelligence_profiles');
+      n = 0;
+      for (const p of insertProfiles)
+        n += (await client.query(insertSql('mkt_intelligence_profiles', p, 'id, version'))).rowCount;
+      console.log(`  inserted ${n} profile rows`);
+      if (scopeConflicts.length)
+        console.log(
+          `  skipped ${scopeConflicts.length} active profiles — scope already claimed on target: ${scopeConflicts
+            .map((p) => p.id)
+            .join(', ')}`,
+        );
+    }
     n = 0;
     for (const a of cleanAudits) n += (await client.query(insertSql('mkt_audits_list', a))).rowCount;
     console.log(`  inserted ${n} audits`);

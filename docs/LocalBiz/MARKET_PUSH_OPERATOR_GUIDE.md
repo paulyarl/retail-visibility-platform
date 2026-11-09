@@ -55,6 +55,7 @@ Options:
 | `--category "…"` | Override the campaign's category filter |
 | `--status queued,verify_then_outreach` | Only export these triage statuses |
 | `--ids pque-1,pque-2` | Explicit queue-id list (bypasses market matching) |
+| `--no-profiles` | Skip the `mkt_intelligence_profiles` leg (default: included — all version rows for the market's category keys, scoped to its geos) |
 | `--out path.json` | Custom output file (default `audits/market-export-<campaign>-<ts>.json`, gitignored) |
 
 The export prints row counts and the **payload size in MB** — that number is the scan volume prd will *not* have to re-read.
@@ -74,6 +75,7 @@ What the plan shows:
 - `campaigns / audits / queue: N to insert, M already exist` — original ids are kept for lineage; re-imports are idempotent (`ON CONFLICT DO NOTHING`)
 - `dup-active (skipped)` — queue rows colliding with an already-`queued` same business+city+category on prd (the `uq_mkt_prospect_queue_active_business` index). These are real dupes; skipping is correct.
 - `skipped (dangling campaign_id)` audits — audit whose source campaign doesn't exist on prd and wasn't in the export. Harmless; queue rows still land.
+- `scope-conflict (skipped)` profiles — an exported `active` profile whose (category_key, focus, city/state/platform) scope is already claimed by a *different* active profile on prd. The target's profile wins; reconcile by hand only if the stg one should win (retire the prd one first).
 - `campaign refs NULLed` — stg-only references (`processed_campaign_id`, etc.) that don't resolve on prd.
 
 Sanitization is automatic: `seed_id`, `seek_batch_id`, `processed_at`, tenant refs, and any campaign FK not present on prd all become `NULL`. Snapshots, triage fields, statuses, and provenance ride through unchanged.
