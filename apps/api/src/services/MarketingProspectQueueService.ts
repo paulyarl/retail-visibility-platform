@@ -1702,6 +1702,34 @@ class MarketingProspectQueueServiceClass extends BaseService {
         }
       }
 
+      // Ground-truth cache warm (§14): a promoted queue entry now owns a
+      // business campaign with NAP — fetch-or-cache the Maps packet so the
+      // first business-audit/repair render hits the 30-day prospect-scoped
+      // cache instead of paying a cold resolve. Dedup-attached campaigns
+      // (created:false) pass through the same cache-first path, so a warm
+      // against an already-fetched prospect costs nothing. Best-effort: a
+      // failed warm must not block promotion, and a missing HASDATA_API_KEY
+      // no-ops inside fetchPacket.
+      if (result.campaign?.id) {
+        try {
+          const { default: groundTruth } = await import('./HasDataGroundTruthService.js');
+          const warm = await groundTruth.fetchPacket(result.campaign.id, 'latest', ctx);
+          logger.info('createCampaignFromQueue: ground-truth warm', ctx, {
+            queueEntryId: input.queueEntryId,
+            campaignId: result.campaign.id,
+            warmed: !!warm.packet,
+            cached: warm.cached,
+            creditsSpent: warm.credits_spent,
+          });
+        } catch (warmErr) {
+          logger.warn('createCampaignFromQueue: ground-truth warm failed (non-fatal)', ctx, {
+            queueEntryId: input.queueEntryId,
+            campaignId: result.campaign.id,
+            error: (warmErr as Error).message,
+          });
+        }
+      }
+
       logger.info('createCampaignFromQueue: campaign created/attached', ctx, {
         queueEntryId: input.queueEntryId,
         campaignId: result.campaign.id,
