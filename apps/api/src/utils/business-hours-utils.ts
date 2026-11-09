@@ -1,5 +1,6 @@
 import { prisma } from '../prisma';
 import { logger } from '../logger';
+import { usStateTimezone } from '../lib/us-timezone';
 
 /**
  * Builds combined business hours object for business profile storage
@@ -65,6 +66,79 @@ export async function buildCombinedHoursObject(tenantId: string): Promise<any | 
     logger.error('[buildCombinedHoursObject] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return null;
   }
+}
+
+const DAYS = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+
+export function parseProfileHoursToPeriods(hours: any): any[] {
+  if (!hours || typeof hours !== 'object') return [];
+  const fallbackPeriods: any[] = [];
+  for (const day of DAYS) {
+    const h = hours[day];
+    if (h && typeof h === 'object' && !h.closed && h.open && h.close) {
+      fallbackPeriods.push({ day: day.toUpperCase(), open: h.open, close: h.close });
+    } else if (typeof h === 'string' && h.toLowerCase() !== 'closed') {
+      const match = h.match(/(\d{1,2}:\d{2}\s*[AP]M)\s*-\s*(\d{1,2}:\d{2}\s*[AP]M)/i);
+      if (match) {
+        fallbackPeriods.push({ day: day.toUpperCase(), open: match[1].trim(), close: match[2].trim() });
+      }
+    }
+  }
+  return fallbackPeriods;
+}
+
+/**
+ * Canonical hours resolver shared by the public and private status endpoints.
+ * Canonical source is business_hours_list; when it has no saved periods the
+ * chain falls back to the seed listing's business_hours blob, then the
+ * business profile hours blob (unclaimed directory seeds live there — the
+ * public status endpoint used to read business_hours_list alone and reported
+ * every seed 'Closed'). The timezone comes from whichever source supplied
+ * hours; if none carries one it's inferred from the listing's state before
+ * the America/New_York default.
+ */
+export async function getTenantBusinessHours(tenantId: string): Promise<{ timezone: string; periods: any[] }> {
+  const row = await prisma.business_hours_list.findUnique({ where: { tenant_id: tenantId } });
+  let timezone: string | null = row?.timezone || null;
+  let periods: any[] = (row?.periods as any) || [];
+  let listingState: string | null | undefined;
+
+  if (periods.length === 0) {
+    const listing = await prisma.directory_listings_list.findFirst({
+      where: { tenant_id: tenantId, listing_origin: 'directory_seed' }
+    });
+    listingState = listing?.state;
+    const listingHours = listing?.business_hours as any;
+    if (listingHours && typeof listingHours === 'object') {
+      periods = parseProfileHoursToPeriods(listingHours);
+      timezone = listingHours.timezone || timezone;
+    }
+
+    if (periods.length === 0) {
+      const profile = await prisma.tenant_business_profiles_list.findUnique({
+        where: { tenant_id: tenantId },
+        select: { hours: true },
+      });
+      const profileHours = profile?.hours as any;
+      if (profileHours && typeof profileHours === 'object') {
+        periods = parseProfileHoursToPeriods(profileHours);
+        timezone = profileHours.timezone || timezone;
+      }
+    }
+  }
+
+  if (!timezone) {
+    if (listingState === undefined) {
+      const listing = await prisma.directory_listings_list.findFirst({
+        where: { tenant_id: tenantId },
+        select: { state: true },
+      });
+      listingState = listing?.state;
+    }
+    timezone = usStateTimezone(listingState) || 'America/New_York';
+  }
+
+  return { timezone, periods };
 }
 
 /**

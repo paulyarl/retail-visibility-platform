@@ -254,4 +254,69 @@ Shared with Merchant at end of term, with evidence per row. A failed row is a re
 
 ---
 
+## Exhibit C — The SWIS framing (merchant-facing narrative)
+
+*Not part of the legal terms. This is the positioning script for pioneer recruitment and in-store demos — the "why" that §2–§4 turn into mechanics.*
+
+### C.1 Visibility is two levels, and merchants only have the first
+
+Every surface a merchant already uses stops at the same ceiling:
+
+| Surface | What it shows | What it can't answer |
+| --- | --- | --- |
+| Their own website | Categories, aisle photos | product-level search |
+| Google Business Profile / Maps | Photos, reviews, NAP | product-level search |
+| Yelp and directories | NAP, photos | product-level search |
+
+The free store-level listing (a claimed `/place/{slug}` page) answers *"does this store exist near me?"* — and the merchant already has it without doing anything. **SWIS is the second level**: it answers *"does a store near me carry {product}?"* — the highest-intent local query that exists, because a person searching a specific item nearby is deciding where to drive today, not browsing.
+
+### C.2 The exclusive problem — "the door becomes SWIS"
+
+Ethnic grocers stock unique and exclusive items — imported brands no chain carries — that are the store's margin *and* its moat. Today the only discovery channel for those items is a shopper physically walking past the shelf. The merchant knows this intuitively: "if only the neighborhood knew what I have."
+
+SWIS removes the physical bottleneck: the shelf becomes searchable at driving distance. **The door becomes SWIS** — and it is the only game in town. No website, GBP listing, or directory can make an exclusive item discoverable; only a product-level feed can.
+
+### C.3 Google built the demand; the supply side is gated
+
+Google already runs SWIS — local inventory surfaces, "in stock near you" results, product-level answers — but it only works for merchants who can produce structured inventory data: Merchant Center feeds, POS integration, schema. That bar excludes virtually every independent ethnic grocer. Google bought Pointy (a physical barcode-scanning box at the register) trying to bridge this gap and still couldn't crack the non-chain segment.
+
+The platform is the missing middleware: it makes these merchants legible to surfaces Google already operates. The pitch line: *"Google already shows 'in stock nearby' results — for stores that can feed it data. This pilot is the way in."*
+
+### C.4 The cohort effect — one searchable surface, 54 stores
+
+No single store's site can answer a shopper's product query — a shopper can't search 54 separate websites. The platform aggregates every participating store's exclusives into **one** searchable surface, which makes it a market-level product rather than a per-store feature: each store's exclusive is only discoverable through its own listing, and the shopper experience only works because the whole cohort is in one place. Every claim makes the surface more valuable to shoppers and to the next merchant.
+
+### C.5 "First in town" — the honest scarcity
+
+The pitch is not "buy a subscription." It is *"be the first store in town whose shelf is searchable."* First-mover here is literal, not marketing: the first claimed SWIS storefront in a neighborhood captures `"{product} near me"` results for that area, and the pioneer cohort is a fixed set — there is no fake deadline, just a real position.
+
+Merchants who don't immediately see the value are not the first-visit target. The two or three who get it become the case study that educates the rest — a validated pilot (Exhibit A) is the artifact that does that teaching.
+
+### C.6 The in-store demo, in three beats
+
+1. **Show them their own page** on a phone — the free seed listing is already live, which answers "who are you?" before the pitch starts.
+2. **Probe the product level** — "people can find your store; they can't find what's *in* it."
+3. **Ask for one exclusive** — "show me one thing only you carry." Then show that nobody in the city can find it online today.
+
+Bilingual note: merchants whose shoppers search in Arabic, Burmese, Spanish, or other community languages face an even emptier competitive field — a seed page in the community's language can own queries an English-only competitor cannot.
+
+### C.7 The door-knock script (~60 seconds)
+
+**Opening — the merchant finds it themselves** (works best where the seed already ranks):
+
+1. **"Pull out your phone — search for your business on Google. Try it."**
+2. **"What do you see?"** Point to the platform's ranked listing. You don't claim their store is listed — they watch themselves find it.
+3. **"Open it — see? It says you can claim it."**
+4. **"Hi, I'm {name} — I work for this platform. We work with businesses like yours."** The intro comes *after* the proof, not before.
+
+**The SWIS turn:**
+
+5. **"Your products can be found too — if you work with us."** Open Maps / search: *"Search for your best product — the one only you carry."*
+6. **"See what comes up — nothing, or a chain. Now imagine your store showing up on product search — not just store search."** The empty result is the pitch. You don't argue the value — you show its absence.
+7. **"It's not going to cost you a lot — monthly, or a one-time option."** Price last, anchored small, after the gap is visible.
+
+**Mechanics:** the merchant holding *their own* phone — a result on their device can't be faked — and the product query that fails today, so the demo can't lose. The discovery opener only works where the seed already ranks; for unranked or noindexed seeds, fall back to opening their `/place/{slug}` listing directly — the claim CTA is still the first yes.
+
+---
+
 *Draft for counsel review. This document records the commercial terms decided in `POS_INGESTION_PARTNER_PATH_SPEC.md` §8 and the consent model in §11. It is not legal advice and should not be signed without professional review.*
