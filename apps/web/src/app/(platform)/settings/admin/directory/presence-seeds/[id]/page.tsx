@@ -1430,10 +1430,34 @@ function PresenceSeedDetailClient() {
       Array.isArray(listing?.secondary_categories) ? listing.secondary_categories : [],
     );
     setEditSlug(listing?.slug ?? '');
-    setEditAddress(listing?.address ?? '');
-    setEditCity(listing?.city ?? '');
-    setEditState(listing?.state ?? '');
-    setEditZipCode(listing?.zip_code ?? '');
+    // Snapshot-born seeds carry the whole formatted address in `address`
+    // with city/state/zip left empty — split it on open so the fields are
+    // populated (the geocoder needs ZIP) and the next save stores
+    // street-only + components. Guard: a bare "street, Suite X" value has
+    // no postal code and no real city+state, so it is left untouched.
+    const rawAddress = listing?.address ?? '';
+    let street = rawAddress;
+    let city = listing?.city ?? '';
+    let state = listing?.state ?? '';
+    let zip = listing?.zip_code ?? '';
+    if (rawAddress && addressParser.canParse(rawAddress)) {
+      const parsed = addressParser.parse(rawAddress);
+      const looksLikeFullAddress =
+        !!parsed.postal_code ||
+        !!(parsed.city && parsed.state && US_STATES.includes(parsed.state));
+      if (looksLikeFullAddress) {
+        street =
+          [parsed.address_line1, parsed.address_line2].filter(Boolean).join(', ') ||
+          rawAddress;
+        city = parsed.city ?? city;
+        state = parsed.state && US_STATES.includes(parsed.state) ? parsed.state : state;
+        zip = parsed.postal_code ?? zip;
+      }
+    }
+    setEditAddress(street);
+    setEditCity(city);
+    setEditState(state);
+    setEditZipCode(zip);
     setEditLatitude(listing?.latitude != null ? String(listing.latitude) : '');
     setEditLongitude(listing?.longitude != null ? String(listing.longitude) : '');
     setEditSnapReported(!!listing?.snap_ebt_reported);
