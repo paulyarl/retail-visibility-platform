@@ -157,6 +157,7 @@ export default function CategoryIdentificationAuditCard({
   // (onSynced refetches the campaign, which then re-feeds these props).
   const [swappedCategory, setSwappedCategory] = useState<string | null | undefined>(undefined);
   const [swappedSecondary, setSwappedSecondary] = useState<string[] | undefined>(undefined);
+  const [applyAllBusy, setApplyAllBusy] = useState(false);
   const effectiveCategory = swappedCategory !== undefined ? swappedCategory : currentCategory;
   const effectiveSecondary = swappedSecondary ?? currentSecondaryCategories;
 
@@ -223,6 +224,30 @@ export default function CategoryIdentificationAuditCard({
     }
   };
 
+  // Apply every suggested candidate as a secondary in one pass — the
+  // per-row "+ Secondary" loop done by the machine. Sequential awaits: the
+  // registration writes append to secondary_categories, so parallel calls
+  // would race the same array. On-campaign and already-applied candidates
+  // are skipped; duplicate labels in the candidate list apply once.
+  const handleApplyAllSecondary = async () => {
+    setApplyAllBusy(true);
+    const applied = new Set<string>();
+    try {
+      for (let i = 0; i < data.candidate_categories.length; i++) {
+        const c = data.candidate_categories[i];
+        const label = c.category.trim().toLowerCase();
+        const onCampaign =
+          eqLabel(c.category, effectiveCategory) ||
+          (effectiveSecondary ?? []).some((s) => eqLabel(s, c.category));
+        if (onCampaign || applied.has(label) || actionStates[i]?.result) continue;
+        applied.add(label);
+        await handleAction(i, c, 'secondary');
+      }
+    } finally {
+      setApplyAllBusy(false);
+    }
+  };
+
   return (
     <div className="border border-cyan-200 dark:border-cyan-800 rounded-lg p-4 bg-cyan-50/30 dark:bg-cyan-900/10">
       {/* Header */}
@@ -264,9 +289,28 @@ export default function CategoryIdentificationAuditCard({
 
       {/* Candidate categories with actions */}
       <div className="mb-4">
-        <p className="text-xs font-semibold text-gray-700 dark:text-gray-300 mb-2">
-          Candidate categories ({data.candidate_categories.length})
-        </p>
+        <div className="flex items-center justify-between mb-2">
+          <p className="text-xs font-semibold text-gray-700 dark:text-gray-300">
+            Candidate categories ({data.candidate_categories.length})
+          </p>
+          {data.candidate_categories.some(
+            (c, i) =>
+              !eqLabel(c.category, effectiveCategory) &&
+              !(effectiveSecondary ?? []).some((s) => eqLabel(s, c.category)) &&
+              !actionStates[i]?.result,
+          ) && (
+            <button
+              type="button"
+              onClick={handleApplyAllSecondary}
+              disabled={applyAllBusy}
+              title="Register every unapplied candidate as a secondary category on this campaign"
+              className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 rounded hover:bg-emerald-100 dark:text-emerald-300 dark:bg-emerald-900/20 dark:border-emerald-700 dark:hover:bg-emerald-900/40 disabled:opacity-50"
+            >
+              {applyAllBusy ? <Loader2 className="w-3 h-3 animate-spin" /> : <Tag className="w-3 h-3" />}
+              Apply all as secondary
+            </button>
+          )}
+        </div>
         <div className="space-y-2">
           {data.candidate_categories.map((c, i) => {
             const state = actionStates[i];

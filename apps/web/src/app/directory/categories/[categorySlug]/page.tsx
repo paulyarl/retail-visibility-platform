@@ -15,6 +15,7 @@ interface PageProps {
     lat?: string;
     lng?: string;
     radius?: string;
+    page?: string;
   }>;
 }
 

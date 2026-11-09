@@ -516,16 +516,20 @@ class RecommendationsSingletonService extends ApiSystemSingleton {
    * Get stores by category slug
    * Public endpoint for directory browsing
    */
-  async getStoresByCategory(categorySlug: string): Promise<any> {
+  async getStoresByCategory(categorySlug: string, page: number = 1, limit: number = 12): Promise<any> {
     try {
       if (!categorySlug) {
         throw new Error('Category slug is required');
       }
 
+      const params = new URLSearchParams();
+      params.append('page', String(Math.max(1, page)));
+      params.append('limit', String(Math.max(1, limit)));
+
       const response = await this.makeDefaultRequest<any>(
-        `/api/directory/mv/categories/${categorySlug}`,
+        `/api/directory/mv/categories/${categorySlug}?${params.toString()}`,
         {},
-        `stores-by-category-${categorySlug}`,
+        `stores-by-category-${categorySlug}-p${page}-l${limit}`,
         this.STATIC_TTL
       );
 
