@@ -88,6 +88,7 @@ interface CategoryViewClientProps {
     lng?: string;
     radius?: string;
     search?: string;
+    page?: string;
   };
   /** Server-rendered national category teaser — feeds the report banner +
       Market Intel panel (§12.3). */
@@ -112,6 +113,9 @@ export default function CategoryViewClient({
   // listings) — resolves enrichment taxonomy labels to hot shelf links.
   const [shelfIndex, setShelfIndex] = useState<DirectoryShelfIndexEntry[]>([]);
   
+  const urlSearchParams = useSearchParams();
+  const page = Math.max(1, parseInt(urlSearchParams.get('page') || '1', 10) || 1);
+
   // Persist view mode in localStorage - start with default to avoid hydration mismatch
   const [viewMode, setViewMode] = useState<'grid' | 'list' | 'map'>('grid');
 
@@ -178,7 +182,7 @@ export default function CategoryViewClient({
         // 2. Fetch stores in this category using directory categories API
         //    (+ the national enrichment packet in parallel — best-effort)
         const [storesData, enrichmentData] = await Promise.all([
-          recommendationsService.getStoresByCategory(decodedSlug),
+          recommendationsService.getStoresByCategory(decodedSlug, page),
           placesBrowsePublicService.getCategoryEnrichment(decodedSlug, '__all__'),
         ]);
         setEnrichment(enrichmentData);
@@ -206,7 +210,7 @@ export default function CategoryViewClient({
     };
 
     fetchData();
-  }, [categorySlug, searchParams.lat, searchParams.lng, searchParams.radius]);
+  }, [categorySlug, page, searchParams.lat, searchParams.lng, searchParams.radius]);
 
   const currentPage = data?.pagination.page || 1;
   const totalPages = data?.pagination.totalPages || 1;
