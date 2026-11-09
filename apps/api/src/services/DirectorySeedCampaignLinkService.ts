@@ -295,7 +295,7 @@ class DirectorySeedCampaignLinkService {
     const tenantId = seedRow[0].tenant_id;
 
     const campRow = await prisma.$queryRaw<any[]>`
-      SELECT id, business_prospect_id, is_primary_sibling FROM mkt_campaigns_list
+      SELECT id, business_prospect_id, is_primary_sibling, scope FROM mkt_campaigns_list
       WHERE id = ${campaignId} LIMIT 1
     `;
     if (!campRow[0]) throw new Error('campaign_not_found');
@@ -303,11 +303,32 @@ class DirectorySeedCampaignLinkService {
     // Enforce single primary link per seed
     if (role === 'primary') {
       const existingPrimary = await prisma.$queryRaw<any[]>`
-        SELECT id FROM directory_seed_campaign_links
-        WHERE seed_id = ${seedId} AND link_role = 'primary'
+        SELECT l.id, c.scope
+        FROM directory_seed_campaign_links l
+        JOIN mkt_campaigns_list c ON c.id = l.campaign_id
+        WHERE l.seed_id = ${seedId} AND l.link_role = 'primary'
         LIMIT 1
       `;
-      if (existingPrimary[0]) throw new Error('primary_link_already_exists');
+      const incumbent = existingPrimary[0];
+      if (incumbent) {
+        // A business-scope campaign supersedes a non-business primary — the
+        // market/category scan that discovered the seed shouldn't block the
+        // engagement campaign that now owns it. The incumbent demotes to
+        // 'sibling' so its provenance is preserved. Legacy NULL scope reads
+        // as 'business' (the codebase default), so business-vs-business
+        // remains a hard conflict for the operator to resolve.
+        const incomingScope = (campRow[0].scope as string | null) ?? 'business';
+        const incumbentScope = (incumbent.scope as string | null) ?? 'business';
+        if (incomingScope === 'business' && incumbentScope !== 'business') {
+          await prisma.$executeRaw`
+            UPDATE directory_seed_campaign_links
+            SET link_role = 'sibling', updated_at = now()
+            WHERE id = ${incumbent.id}
+          `;
+        } else {
+          throw new Error('primary_link_already_exists');
+        }
+      }
 
       // One seed per prospect: a non-primary sibling campaign never owns a
       // seed's primary link — the prospect's seed belongs to the primary
