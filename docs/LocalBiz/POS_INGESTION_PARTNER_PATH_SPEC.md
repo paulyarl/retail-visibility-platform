@@ -632,3 +632,37 @@ A claimed listing's public "website" is a resolved address, not a raw field. Pre
 **Reuse, do not re-derive.** Levels 1–3 are already implemented once: `buildStorefrontEntries` (`apps/api/src/lib/sitemap.ts:246`) resolves custom domain → subdomain → platform path from `{ baseUrl, apex, tenants: [{ tenantId, subdomain, customDomain }] }`, and the storefront sitemaps call it today. The listing contact block should call the same resolver and treat the external website as the fallback beneath it — otherwise the sitemap and the listing can disagree about where a merchant lives, which is a NAP-class inconsistency with a URL instead of a phone number.
 
 Note the entitlement layer is separate: `resolveStorefrontDomains` (`services/resolvers/StorefrontDomainsResolver.ts`) answers *which levels are allowed*; `buildStorefrontEntries` answers *which address this tenant actually has*. The contact block needs the second, not the first.
+
+---
+
+## 19. SWIS alignment — the shared reconcile core (added 2026-11-10)
+
+Reviewed against `POS_STOCK_SYNC_SPEC.md` and the shipped `PosStockSyncService`
+(`apps/api/src/services/PosStockSyncService.ts`). The lane's core claim holds —
+the importer is a fourth producer into `inventory_items`, downstream unchanged —
+with three deltas:
+
+**19.1 Stock writes route through `reconcileStock`, not direct update.** The
+importer emits `PosStockDiff`s (`source: 'file_import'` — enum already extended)
+into `posStockSyncService.reconcileStock`, which gives the file lane the same
+skip-unchanged dedup and `swisDirty` collection the POS lanes get, then
+`swisPushForDirty` pushes the changed `swis_listed` items. The importer still
+owns the *catalog* upsert (new SKU → create, name/price updates) — reconcile
+takes over only the `stock` write.
+
+**19.2 Staleness gate is fresh-by-construction in the push-on-change path.**
+`swisPushForDirty` fires only for items whose stock actually changed — for a
+file-cadence tenant a change *is* the latest import, so the push is inherently
+fresh. The §13 `last_import_at` cutoff remains required but only for the
+*re-push* lanes (`gmc-scheduled-sync` re-pushing unchanged `swis_listed` items,
+and any future scheduled full-push), where a stale pricebook would otherwise
+re-assert "in stock" indefinitely. No new column needed — the cutoff reads the
+latest completed `inventory_import_log` row (`migration 374`) for
+file-source tenants.
+
+**19.3 Quantity-less imports skip stock entirely.** If an export lacks a
+quantity/on-hand column (kill test 3's failure mode), the importer must NOT emit
+stock diffs for those items — `reconcileStock` clamps garbage to 0, which would
+otherwise mark the whole catalog out-of-stock. Catalog fields (name/price)
+still upsert; the item simply carries its prior stock state, and the pilot
+claim narrows to "we carry this" per §12 test 3.
