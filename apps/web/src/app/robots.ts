@@ -55,7 +55,11 @@ export default function robots(): MetadataRoute.Robots {
           '/retail/',
           '/items',
           '/debug/',
-          '/settings',
+          // /settings is intentionally NOT disallowed: a Disallow only blocks
+          // crawling, so a linked /settings URL gets indexed sight-unseen
+          // ("Indexed, though blocked by robots.txt"). It's served with
+          // X-Robots-Tag: noindex instead — Google must be able to crawl the
+          // page to see the deindex directive.
         ],
       },
     ],
