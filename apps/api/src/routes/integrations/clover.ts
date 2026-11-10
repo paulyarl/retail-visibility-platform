@@ -401,7 +401,7 @@ router.get('/:tenantId/clover/status', authenticateToken, checkTenantAccess, asy
     });
 
     return res.json({
-      enabled: true,
+      enabled: integration.status !== 'disconnected',
       mode: integration.mode,
       status: integration.status,
       merchantId: integration.merchant_id,
@@ -1717,6 +1717,10 @@ router.post('/:tenantId/clover/sync', authenticateToken, checkTenantAccess, requ
 
     if (!integration) {
       return res.status(404).json({ error: 'integration_not_found' });
+    }
+
+    if (integration.status !== 'active') {
+      return res.status(409).json({ error: 'not_connected', message: 'Clover integration is not connected' });
     }
 
     // Allow sync in both demo and production mode (demo uses mock data)
