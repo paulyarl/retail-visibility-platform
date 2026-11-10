@@ -162,6 +162,8 @@ if (process.env.NODE_ENV !== "test") {
           { name: 'supplier-opensource-sync-nightly', scheduleLabel: 'nightly backfill', description: 'Open-source supplier nightly backfill' },
           { name: 'gbp-review-ingestion', scheduleLabel: 'hourly', description: 'Polls Google reviews, refreshes ratings, fires CRM alerts' },
           { name: 'gbp-post-scheduler', scheduleLabel: 'every 5 minutes', description: 'Publishes due scheduled GBP posts' },
+          { name: 'clover-stock-sync', scheduleLabel: 'every 15 minutes', description: 'Polls Clover item stock into inventory_items + SWIS local inventory push' },
+          { name: 'square-stock-sync', scheduleLabel: 'daily', description: 'Polls Square inventory counts into inventory_items + SWIS local inventory push' },
           { name: 'flyer-expiry-enforcer', scheduleLabel: 'every 5 minutes', description: 'Transitions flyer windows and releases orphan variants' },
           // Tier B autopilot — declared but NOT scheduled. Flip on via
           // startGbpReviewAutopilot() + GBP_AUTOPILOT_ENABLED (see jobs/gbpReviewAutopilot.ts).
@@ -178,6 +180,24 @@ if (process.env.NODE_ENV !== "test") {
         logger.info('GMC scheduled sync started (every 6 hours)');
       } catch (err) {
         logger.error('Failed to start GMC scheduled sync', undefined, { error: { name: err instanceof Error ? err.name : 'Error', message: err instanceof Error ? err.message : String(err), stack: err instanceof Error ? err.stack : undefined } });
+      }
+
+      // Start Clover stock sync (every 15 minutes)
+      try {
+        const { startCloverStockSync } = await import('./jobs/clover-stock-sync');
+        startCloverStockSync();
+        logger.info('Clover stock sync started (every 15 minutes)');
+      } catch (err) {
+        logger.error('Failed to start Clover stock sync', undefined, { error: { name: err instanceof Error ? err.name : 'Error', message: err instanceof Error ? err.message : String(err), stack: err instanceof Error ? err.stack : undefined } });
+      }
+
+      // Start Square stock sync (daily)
+      try {
+        const { startSquareStockSync } = await import('./jobs/square-stock-sync');
+        startSquareStockSync();
+        logger.info('Square stock sync started (daily)');
+      } catch (err) {
+        logger.error('Failed to start Square stock sync', undefined, { error: { name: err instanceof Error ? err.name : 'Error', message: err instanceof Error ? err.message : String(err), stack: err instanceof Error ? err.stack : undefined } });
       }
 
       // Start GMC sync retry (every 2 hours)

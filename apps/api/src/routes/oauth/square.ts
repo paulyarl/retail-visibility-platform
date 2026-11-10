@@ -79,6 +79,17 @@ router.get('/callback', async (req, res) => {
     // Exchange code for token
     await squareOAuth.exchangeCodeForToken(code, tenantId);
 
+    // Provision the POS integration row + first catalog mapping.
+    // Best-effort — connection already exists in oauth_tokens.
+    try {
+      const { provisionSquareIntegration } = await import('../../services/square/square-stock-sync');
+      await provisionSquareIntegration(tenantId);
+    } catch (provErr) {
+      logger.warn('[Square OAuth] integration provisioning failed (non-fatal)', undefined, {
+        tenantId, error: provErr instanceof Error ? provErr.message : String(provErr),
+      });
+    }
+
     // Redirect to success page (use web domain, not API domain)
     res.redirect(`${webBaseUrl}/t/${tenantId}/settings/payment-gateways?connected=square&success=true`);
   } catch (error: any) {
