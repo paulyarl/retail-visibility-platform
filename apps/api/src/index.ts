@@ -164,6 +164,7 @@ if (process.env.NODE_ENV !== "test") {
           { name: 'gbp-post-scheduler', scheduleLabel: 'every 5 minutes', description: 'Publishes due scheduled GBP posts' },
           { name: 'clover-stock-sync', scheduleLabel: 'every 15 minutes', description: 'Polls Clover item stock into inventory_items + SWIS local inventory push' },
           { name: 'square-stock-sync', scheduleLabel: 'daily', description: 'Polls Square inventory counts into inventory_items + SWIS local inventory push' },
+          { name: 'pos-dirty-flush', scheduleLabel: 'every 15 minutes', description: 'Flushes POS webhook dirty-item queue via Clover stock re-pull + SWIS push' },
           { name: 'flyer-expiry-enforcer', scheduleLabel: 'every 5 minutes', description: 'Transitions flyer windows and releases orphan variants' },
           // Tier B autopilot — declared but NOT scheduled. Flip on via
           // startGbpReviewAutopilot() + GBP_AUTOPILOT_ENABLED (see jobs/gbpReviewAutopilot.ts).
@@ -198,6 +199,15 @@ if (process.env.NODE_ENV !== "test") {
         logger.info('Square stock sync started (daily)');
       } catch (err) {
         logger.error('Failed to start Square stock sync', undefined, { error: { name: err instanceof Error ? err.name : 'Error', message: err instanceof Error ? err.message : String(err), stack: err instanceof Error ? err.stack : undefined } });
+      }
+
+      // Start POS dirty-item flush (every 15 minutes)
+      try {
+        const { startPosDirtyFlush } = await import('./jobs/pos-dirty-flush');
+        startPosDirtyFlush();
+        logger.info('POS dirty-item flush started (every 15 minutes)');
+      } catch (err) {
+        logger.error('Failed to start POS dirty flush', undefined, { error: { name: err instanceof Error ? err.name : 'Error', message: err instanceof Error ? err.message : String(err), stack: err instanceof Error ? err.stack : undefined } });
       }
 
       // Start GMC sync retry (every 2 hours)

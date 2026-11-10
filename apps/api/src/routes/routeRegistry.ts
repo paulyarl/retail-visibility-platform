@@ -38,6 +38,7 @@ import clientErrorRoutes from '../routes/client-errors';
 import webhooksRoutes from '../routes/webhooks';
 import stripeConnectWebhooks from '../routes/stripe-connect-webhooks';
 import faireWebhookRoutes from '../routes/webhooks/faire';
+import cloverWebhookRoutes from '../routes/webhooks/clover';
 
 // Infrastructure
 import cacheMonitoringRoutes from '../routes/cache-monitoring';
@@ -377,6 +378,14 @@ export const routeRegistry: RouteEntry[] = [
     domain: 'pre-middleware',
     authLevel: 'webhook',
     comment: 'Faire webhook - requires raw body for signature verification',
+    preMiddleware: true,
+  },
+  {
+    path: '/api/webhooks/clover',
+    router: cloverWebhookRoutes,
+    domain: 'pre-middleware',
+    authLevel: 'webhook',
+    comment: 'Clover POS webhook - requires raw body for X-Clover-Auth HMAC verification',
     preMiddleware: true,
   },
 
