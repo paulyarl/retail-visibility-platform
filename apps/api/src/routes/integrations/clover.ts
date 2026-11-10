@@ -1895,9 +1895,10 @@ router.post('/:tenantId/clover/sync', authenticateToken, checkTenantAccess, requ
             data: {
               id: generateCloverItemId(),
               tenant_id: tenantId,
-              sku: cloverItem.sku,
+              sku: cloverItem.sku || cloverItem.id,
               name: cloverItem.name,
               price_cents: cloverItem.price,
+              price: (cloverItem.price || 0) / 100,
               sale_price_cents: cloverItem.salePrice || null,
               stock: cloverItem.stockCount,
               directory_category_id: rvpCategoryId,
