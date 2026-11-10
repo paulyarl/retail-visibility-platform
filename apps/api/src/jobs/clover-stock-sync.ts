@@ -64,7 +64,7 @@ async function fetchCloverStockCounts(
   return { stockByItemId, httpStatus };
 }
 
-async function syncIntegration(integration: {
+export async function syncIntegration(integration: {
   id: string;
   tenant_id: string;
   merchant_id: string;
