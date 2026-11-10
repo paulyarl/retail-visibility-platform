@@ -13,7 +13,7 @@ const CLOVER_CONFIG = {
   sandbox: {
     authUrl: 'https://sandbox.dev.clover.com/oauth/authorize',
     tokenUrl: 'https://sandbox.dev.clover.com/oauth/token',
-    apiBaseUrl: 'https://sandbox.dev.clover.com',
+    apiBaseUrl: 'https://apisandbox.dev.clover.com',
   },
   // Production
   production: {
