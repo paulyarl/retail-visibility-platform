@@ -1272,6 +1272,7 @@ export class DirectoryPresenceAdminService extends AdminApiSingleton {
     state?: string;
     category?: string;
     seedBatch?: string;
+    pgCampaignId?: string;
   }): Promise<TemplatedDescriptionSeed[]> {
     const params = new URLSearchParams();
     if (filters?.status) params.set('status', filters.status);
@@ -1279,6 +1280,7 @@ export class DirectoryPresenceAdminService extends AdminApiSingleton {
     if (filters?.state) params.set('state', filters.state);
     if (filters?.category) params.set('category', filters.category);
     if (filters?.seedBatch) params.set('seedBatch', filters.seedBatch);
+    if (filters?.pgCampaignId) params.set('pgCampaignId', filters.pgCampaignId);
     const qs = params.toString();
     const result = await this.makeDefaultRequest<any>(
       `/api/admin/directory-presence/presence-seeds/templated-descriptions${qs ? `?${qs}` : ''}`,

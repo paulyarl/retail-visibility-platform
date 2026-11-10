@@ -5,6 +5,7 @@ import Link from 'next/link';
 import PageHeader from '@/components/PageHeader';
 import { MarketingOpsNavShell } from '@/components/marketing-ops/MarketingOpsPageShell';
 import directoryPresenceAdminService, {
+  type SeedBatchSummary,
   type TemplatedDescriptionSeed,
   type TemplatedSeedCampaign,
 } from '@/services/DirectoryPresenceAdminService';
@@ -38,6 +39,16 @@ function sourceLabel(source: string | null): string {
   return SOURCE_LABELS[source] ?? 'template-shaped';
 }
 
+/** Triage state for a templated seed — drives the enrichment-state filter. */
+function enrichmentState(seed: TemplatedDescriptionSeed): 'needs_campaign' | 'awaiting_audit' | 'has_audit' {
+  const primaryBusiness = seed.campaigns.find(
+    (c) => (c.scope ?? 'business') === 'business' && c.linkRole === 'primary',
+  );
+  if (primaryBusiness?.hasRealAudit) return 'has_audit';
+  if (primaryBusiness) return 'awaiting_audit';
+  return 'needs_campaign';
+}
+
 export default function TemplatedDescriptionsPage() {
   return (
     <MarketingOpsNavShell>
@@ -49,12 +60,16 @@ export default function TemplatedDescriptionsPage() {
 function TemplatedDescriptionsContent() {
   const [seeds, setSeeds] = useState<TemplatedDescriptionSeed[]>([]);
   const [optionSeeds, setOptionSeeds] = useState<TemplatedDescriptionSeed[]>([]);
+  const [batchOptions, setBatchOptions] = useState<SeedBatchSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [filterCity, setFilterCity] = useState('');
   const [filterState, setFilterState] = useState('');
   const [filterCategory, setFilterCategory] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
+  const [filterBatch, setFilterBatch] = useState('');
+  const [filterPg, setFilterPg] = useState('');
+  const [filterEnrich, setFilterEnrich] = useState('');
   const [busySeedId, setBusySeedId] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [rowError, setRowError] = useState<Record<string, string>>({});
@@ -68,6 +83,8 @@ function TemplatedDescriptionsContent() {
         state: filterState || undefined,
         category: filterCategory || undefined,
         status: filterStatus || undefined,
+        seedBatch: filterBatch || undefined,
+        pgCampaignId: filterPg || undefined,
       });
       setSeeds(data);
       setError(null);
@@ -76,7 +93,7 @@ function TemplatedDescriptionsContent() {
     } finally {
       setLoading(false);
     }
-  }, [filterCity, filterState, filterCategory, filterStatus]);
+  }, [filterCity, filterState, filterCategory, filterStatus, filterBatch, filterPg]);
 
   useEffect(() => {
     fetchSeeds();
@@ -95,6 +112,16 @@ function TemplatedDescriptionsContent() {
       .catch(() => {
         if (!cancelled) setOptionSeeds([]);
       });
+    // Market (seed-batch) + proving-ground dropdown options come from the
+    // batch rollup — it carries the cohort labels and the PG attribution.
+    directoryPresenceAdminService
+      .listSeedBatches()
+      .then((list) => {
+        if (!cancelled) setBatchOptions(list);
+      })
+      .catch(() => {
+        if (!cancelled) setBatchOptions([]);
+      });
     return () => {
       cancelled = true;
     };
@@ -112,6 +139,26 @@ function TemplatedDescriptionsContent() {
     () => Array.from(new Set(optionSeeds.map((s) => s.category).filter(Boolean))).sort(),
     [optionSeeds],
   );
+  // Unique proving grounds across every batch — label with the PG display id
+  // plus the market its batches cover so "MC-1042" reads as "MC-1042 · Indy".
+  const pgOptions = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const b of batchOptions) {
+      for (const pg of b.provingGrounds ?? []) {
+        if (!map.has(pg.id)) {
+          map.set(pg.id, [pg.displayId || pg.id, b.topCity].filter(Boolean).join(' · '));
+        }
+      }
+    }
+    return Array.from(map.entries())
+      .map(([id, label]) => ({ id, label }))
+      .sort((a, b) => a.label.localeCompare(b.label));
+  }, [batchOptions]);
+
+  const visibleSeeds = useMemo(() => {
+    if (!filterEnrich) return seeds;
+    return seeds.filter((s) => enrichmentState(s) === filterEnrich);
+  }, [seeds, filterEnrich]);
 
   const handleSpawn = async (seed: TemplatedDescriptionSeed) => {
     setBusySeedId(seed.id);
@@ -202,6 +249,38 @@ function TemplatedDescriptionsContent() {
       {/* Filters */}
       <div className="flex flex-wrap items-center gap-3">
         <select
+          value={filterBatch}
+          onChange={(e) => setFilterBatch(e.target.value)}
+          className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm dark:border-neutral-600 dark:bg-neutral-800"
+        >
+          <option value="">All markets / batches</option>
+          {batchOptions.map((b) => (
+            <option key={b.seedBatch} value={b.seedBatch}>
+              {seedBatchDisplayLabel(b)}
+            </option>
+          ))}
+        </select>
+        <select
+          value={filterPg}
+          onChange={(e) => setFilterPg(e.target.value)}
+          className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm dark:border-neutral-600 dark:bg-neutral-800"
+        >
+          <option value="">All proving grounds</option>
+          {pgOptions.map((pg) => (
+            <option key={pg.id} value={pg.id}>{pg.label}</option>
+          ))}
+        </select>
+        <select
+          value={filterEnrich}
+          onChange={(e) => setFilterEnrich(e.target.value)}
+          className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm dark:border-neutral-600 dark:bg-neutral-800"
+        >
+          <option value="">Any enrichment state</option>
+          <option value="needs_campaign">needs campaign</option>
+          <option value="awaiting_audit">campaign ready — awaiting audit</option>
+          <option value="has_audit">audit on file</option>
+        </select>
+        <select
           value={filterStatus}
           onChange={(e) => setFilterStatus(e.target.value)}
           className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm dark:border-neutral-600 dark:bg-neutral-800"
@@ -242,22 +321,26 @@ function TemplatedDescriptionsContent() {
           ))}
         </select>
         <span className="text-sm text-gray-500 dark:text-gray-400">
-          {loading ? 'Loading…' : `${seeds.length} seed${seeds.length === 1 ? '' : 's'}`}
+          {loading
+            ? 'Loading…'
+            : `${visibleSeeds.length} seed${visibleSeeds.length === 1 ? '' : 's'}`}
         </span>
       </div>
 
       {/* Seed list */}
-      {!loading && seeds.length === 0 && !error && (
+      {!loading && visibleSeeds.length === 0 && !error && (
         <div className="rounded-xl border border-emerald-200 bg-emerald-50/50 px-6 py-10 text-center dark:border-emerald-900/50 dark:bg-emerald-950/20">
           <Sparkles className="mx-auto h-8 w-8 text-emerald-500" />
           <p className="mt-2 text-sm font-medium text-emerald-800 dark:text-emerald-300">
-            No templated descriptions — every live seed carries enriched or human-authored copy.
+            {seeds.length === 0
+              ? 'No templated descriptions — every live seed carries enriched or human-authored copy.'
+              : 'No templated seeds match these filters.'}
           </p>
         </div>
       )}
 
       <div className="space-y-3">
-        {seeds.map((seed) => (
+        {visibleSeeds.map((seed) => (
           <TemplatedSeedCard
             key={seed.id}
             seed={seed}

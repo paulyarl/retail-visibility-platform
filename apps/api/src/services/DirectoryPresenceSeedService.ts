@@ -538,6 +538,10 @@ class DirectoryPresenceSeedService {
     state?: string;
     category?: string;
     seedBatch?: string;
+    /** Limit to seeds attributable to a proving ground — via a campaign link
+     *  (any role) or the `pg-<campaignId>-<yyyymmdd>` batch-label convention
+     *  (same lineage doctrine as listSeedBatches). */
+    pgCampaignId?: string;
   }): Promise<TemplatedDescriptionSeed[]> {
     const conditions: string[] = [
       `dps.status IS DISTINCT FROM 'claimed'`,
@@ -579,6 +583,17 @@ class DirectoryPresenceSeedService {
     if (filters?.seedBatch) {
       conditions.push(`dps.seed_batch = $${paramIdx++}`);
       params.push(filters.seedBatch);
+    }
+    if (filters?.pgCampaignId) {
+      const p = `$${paramIdx++}`;
+      params.push(filters.pgCampaignId);
+      conditions.push(`(
+        EXISTS (
+          SELECT 1 FROM directory_seed_campaign_links pgl
+          WHERE pgl.seed_id = dps.id AND pgl.campaign_id = ${p}
+        )
+        OR dps.seed_batch ILIKE 'pg-' || ${p} || '-%'
+      )`);
     }
 
     const seeds = await prisma.$queryRawUnsafe<any[]>(`

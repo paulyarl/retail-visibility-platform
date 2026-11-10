@@ -1600,6 +1600,7 @@ router.get('/presence-seeds/templated-descriptions', requirePlatformStaff, async
       state: req.query.state as string | undefined,
       category: req.query.category as string | undefined,
       seedBatch: req.query.seedBatch as string | undefined,
+      pgCampaignId: req.query.pgCampaignId as string | undefined,
     });
     res.json({ success: true, seeds });
   } catch (error: any) {
