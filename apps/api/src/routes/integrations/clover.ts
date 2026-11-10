@@ -1746,6 +1746,7 @@ router.post('/:tenantId/clover/sync', authenticateToken, checkTenantAccess, requ
     let itemsCreated = 0;
     let itemsUpdated = 0;
     let itemsFailed = 0;
+    const itemErrorDetails: string[] = [];
 
     // ========================================
     // STEP 1: Sync Categories (Clover → VisibleShelf)
@@ -1891,17 +1892,18 @@ router.post('/:tenantId/clover/sync', authenticateToken, checkTenantAccess, requ
         } else if (importNew) {
           // Create new VisibleShelf item
           const newItem = await prisma.inventory_items.create({
-            data: { 
+            data: {
               id: generateCloverItemId(),
               tenant_id: tenantId,
               sku: cloverItem.sku,
               name: cloverItem.name,
-              priceCents: cloverItem.price,
-              salePriceCents: cloverItem.salePrice || null,
-              stockQuantity: cloverItem.stockCount,
+              price_cents: cloverItem.price,
+              sale_price_cents: cloverItem.salePrice || null,
+              stock: cloverItem.stockCount,
               directory_category_id: rvpCategoryId,
-              itemStatus: 'active',
+              item_status: 'active',
               visibility: 'public',
+              product_type: 'physical',
               updated_at: new Date()
             } as any
           });
@@ -1943,6 +1945,7 @@ router.post('/:tenantId/clover/sync', authenticateToken, checkTenantAccess, requ
       } catch (itemError) {
         logger.error(`[Clover Sync] Failed to sync item ${cloverItem.name}:`, req.ctx, { error: { name: (itemError as any)?.name || 'Error', message: (itemError as any)?.message || String(itemError), stack: (itemError as any)?.stack } });
         itemsFailed++;
+        itemErrorDetails.push(`${cloverItem.name}: ${(itemError as any)?.message || String(itemError)}`.slice(0, 300));
       }
     }
 
@@ -1955,6 +1958,7 @@ router.post('/:tenantId/clover/sync', authenticateToken, checkTenantAccess, requ
         items_processed: cloverData.items.length,
         items_succeeded: itemsCreated + itemsUpdated,
         items_failed: itemsFailed,
+        error_details: itemErrorDetails.length ? { itemErrors: itemErrorDetails.slice(0, 20) } : undefined,
         completed_at: new Date(),
         duration_ms: duration
       }
