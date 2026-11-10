@@ -45,15 +45,35 @@ async function fetchCloverStockCounts(
       { headers: { Authorization: `Bearer ${integration.access_token}` } },
     );
     httpStatus = res.status;
+    const bodyText = await res.text().catch(() => '');
     if (!res.ok) {
-      const body = await res.text().catch(() => '');
+      logger.warn('[clover-stock-sync] items fetch failed', undefined, {
+        merchantId: integration.merchant_id,
+        httpStatus: res.status,
+        body: bodyText.slice(0, 500),
+      });
       throw Object.assign(new Error(`clover_items_${res.status}`), {
         httpStatus: res.status,
-        body: body.slice(0, 500),
+        body: bodyText.slice(0, 500),
       });
     }
-    const data = (await res.json()) as { elements?: Array<{ id?: string; stockCount?: number }> };
+    let data: { elements?: Array<{ id?: string; stockCount?: number }> } = {};
+    try {
+      data = JSON.parse(bodyText);
+    } catch {
+      logger.warn('[clover-stock-sync] non-JSON items response', undefined, {
+        merchantId: integration.merchant_id,
+        body: bodyText.slice(0, 500),
+      });
+    }
     const elements = data.elements || [];
+    if (elements.length === 0) {
+      logger.warn('[clover-stock-sync] empty items payload', undefined, {
+        merchantId: integration.merchant_id,
+        httpStatus: res.status,
+        body: bodyText.slice(0, 500),
+      });
+    }
     for (const el of elements) {
       if (el.id) stockByItemId.set(el.id, el.stockCount ?? 0);
     }
