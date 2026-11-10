@@ -2318,9 +2318,10 @@ router.post('/:tenantId/clover/proxy', authenticateToken, checkTenantAccess, req
       });
     }
 
-    const apiBase = process.env.CLOVER_ENVIRONMENT === 'production'
-      ? 'https://api.clover.com'
-      : 'https://sandbox.dev.clover.com';
+    // Tokens issued by the sandbox OAuth flow validate against api.clover.com
+    // (the REST host), not sandbox.dev.clover.com (the dashboard host) —
+    // matches fetchCloverInventory, which successfully reads items this way.
+    const apiBase = process.env.CLOVER_API_BASE_URL || 'https://api.clover.com';
 
     const upstream = await fetch(`${apiBase}/${normalized}`, {
       method: methodUp,
