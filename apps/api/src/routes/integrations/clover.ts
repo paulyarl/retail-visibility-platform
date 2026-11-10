@@ -495,7 +495,7 @@ router.get('/clover/oauth/callback', async (req: Request, res: Response) => {
     // Check for OAuth errors
     if (oauthError) {
       logger.error('[OAuth Callback] OAuth error:', req.ctx, { error: { name: (oauthError as any)?.name || 'Error', message: (oauthError as any)?.message || String(oauthError), stack: (oauthError as any)?.stack } });
-      return res.redirect(`/settings/integrations?error=oauth_denied&message=${oauthError}`);
+      return res.redirect(`${unifiedConfig.webUrl}/settings/integrations?error=oauth_denied&message=${oauthError}`);
     }
 
     if (!code || !state) {
@@ -513,7 +513,7 @@ router.get('/clover/oauth/callback', async (req: Request, res: Response) => {
     const stateAge = Date.now() - stateData.timestamp;
     const maxAge = 10 * 60 * 1000; // 10 minutes
     if (stateAge > maxAge) {
-      return res.redirect(`/t/${tenantId}/settings/integrations?error=state_expired`);
+      return res.redirect(`${unifiedConfig.webUrl}/t/${tenantId}/settings/integrations?error=state_expired`);
     }
 
     // Exchange code for token
@@ -581,14 +581,14 @@ router.get('/clover/oauth/callback', async (req: Request, res: Response) => {
     });
 
     // Redirect back to integrations page with success message
-    return res.redirect(`/t/${tenantId}/settings/integrations?success=connected`);
+    return res.redirect(`${unifiedConfig.webUrl}/t/${tenantId}/settings/integrations?success=connected`);
 
   } catch (error: any) {
     logger.error('[OAuth Callback] Error:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     // Try to redirect with error, fallback to error page
     const tenantId = req.query.state ? decodeState(req.query.state as string).tenantId : null;
     if (tenantId) {
-      return res.redirect(`/t/${tenantId}/settings/integrations?error=connection_failed&message=${encodeURIComponent(error.message)}`);
+      return res.redirect(`${unifiedConfig.webUrl}/t/${tenantId}/settings/integrations?error=connection_failed&message=${encodeURIComponent(error.message)}`);
     }
     return res.status(500).json({
       error: 'oauth_callback_failed',
