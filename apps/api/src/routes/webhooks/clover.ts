@@ -20,10 +20,15 @@ import { logger } from '../../logger';
 
 const router = express.Router();
 
-function verifyCloverSignature(rawBody: Buffer, signature: string, secret: string): boolean {
-  const expected = crypto.createHmac('sha256', secret).update(rawBody).digest('hex');
+/**
+ * Verify the Clover auth code. Per Clover docs: X-Clover-Auth carries a
+ * static per-app auth code (shown in App Settings → Webhooks after URL
+ * validation), NOT an HMAC over the body. Compare constant-time.
+ * CLOVER_WEBHOOK_SECRET holds that auth code.
+ */
+function verifyCloverSignature(_rawBody: Buffer, signature: string, secret: string): boolean {
   try {
-    return crypto.timingSafeEqual(Buffer.from(expected, 'hex'), Buffer.from(signature, 'hex'));
+    return crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(secret));
   } catch {
     return false;
   }
@@ -40,8 +45,12 @@ router.post(
     }
 
     const signature = req.headers['x-clover-auth'] as string | undefined;
-    const rawBody = req.body as Buffer;
-    const rawText = Buffer.isBuffer(rawBody) ? rawBody.toString('utf8') : '';
+    const rawBody = req.body;
+    // Body may arrive as a Buffer (raw) or an already-parsed object if an
+    // upstream JSON middleware consumed it — handle both.
+    const rawText = Buffer.isBuffer(rawBody)
+      ? rawBody.toString('utf8')
+      : (typeof rawBody === 'object' && rawBody !== null ? JSON.stringify(rawBody) : '');
 
     if (!signature) {
       // Unsigned POST — Clover's URL-verification ping arrives without an
@@ -54,14 +63,14 @@ router.post(
       });
       return res.json({ success: true, verified: true });
     }
-    if (!verifyCloverSignature(rawBody, signature, secret)) {
+    if (!Buffer.isBuffer(rawBody) || !verifyCloverSignature(rawBody, signature, secret)) {
       logger.warn('[Clover Webhook] signature verification failed', undefined);
       return res.status(401).json({ success: false, error: 'invalid_signature' });
     }
 
     let payload: any;
     try {
-      payload = JSON.parse(rawBody.toString('utf8'));
+      payload = JSON.parse(rawText);
     } catch {
       return res.status(400).json({ success: false, error: 'invalid_json' });
     }
