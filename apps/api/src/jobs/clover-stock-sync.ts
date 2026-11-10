@@ -26,9 +26,9 @@ function pollIntervalMs(): number {
 }
 
 function cloverApiBaseUrl(): string {
-  return (process.env.CLOVER_ENVIRONMENT || 'sandbox') === 'sandbox'
-    ? 'https://sandbox.dev.clover.com'
-    : 'https://api.clover.com';
+  // REST host — tokens issued by the sandbox OAuth flow validate against
+  // api.clover.com, not the sandbox.dev.clover.com dashboard host.
+  return process.env.CLOVER_API_BASE_URL || 'https://api.clover.com';
 }
 
 /** Paginate /v3/merchants/{id}/items → Map<cloverItemId, stockCount>. */
