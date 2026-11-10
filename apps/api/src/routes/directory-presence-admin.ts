@@ -1585,6 +1585,31 @@ router.get('/presence-seeds/by-campaign/:campaignId', requirePlatformStaff, asyn
   }
 });
 
+/** GET /api/admin/directory/presence-seeds/templated-descriptions
+ *  Worklist: live seeds whose listing description is still the composer's
+ *  deterministic template. Each row carries the seed's linked campaigns
+ *  (with real-audit flags) so the operator can spawn a business-scope
+ *  campaign (POST /:id/spawn-campaign), run the business_analysis audit
+ *  there, and let the post-audit resharpen write the enriched copy.
+ *  Registered before /presence-seeds/:id so the subpath is not swallowed. */
+router.get('/presence-seeds/templated-descriptions', requirePlatformStaff, async (req: Request, res: Response) => {
+  try {
+    const seeds = await DirectoryPresenceSeedService.listTemplatedDescriptionSeeds({
+      status: req.query.status as string | undefined,
+      city: req.query.city as string | undefined,
+      state: req.query.state as string | undefined,
+      category: req.query.category as string | undefined,
+      seedBatch: req.query.seedBatch as string | undefined,
+    });
+    res.json({ success: true, seeds });
+  } catch (error: any) {
+    logger.error('[GET /api/admin/directory/presence-seeds/templated-descriptions] Error:', undefined, {
+      error: { name: error?.name || 'Error', message: error?.message || String(error) },
+    });
+    res.status(500).json({ error: 'internal_error' });
+  }
+});
+
 /** GET /api/admin/directory/presence-seeds/:id — seed detail */
 router.get('/presence-seeds/:id', requirePlatformStaff, async (req: Request, res: Response) => {
   try {

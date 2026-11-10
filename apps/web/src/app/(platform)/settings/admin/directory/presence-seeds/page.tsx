@@ -329,6 +329,13 @@ function PresenceSeedsContent() {
               Cleanup
             </Link>
             <Link
+              href="/settings/admin/directory/presence-seeds/templated-descriptions"
+              className="inline-flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50"
+            >
+              <FileText className="w-4 h-4" />
+              Templated
+            </Link>
+            <Link
               href="/settings/admin/directory/presence-seeds/new"
               className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700"
             >

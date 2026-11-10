@@ -226,6 +226,42 @@ export interface SeedSummary {
   pendingOwnerProposals?: number;
 }
 
+/** A linked campaign row on the templated-description worklist — tells the
+ *  operator whether a business-scope audit campaign already exists for the
+ *  seed (and whether a real, non-stub business_analysis audit has landed). */
+export interface TemplatedDescriptionSeedCampaign {
+  id: string;
+  displayId: string | null;
+  title: string | null;
+  scope: string | null;
+  linkRole: 'primary' | 'sibling' | 'recovery';
+  stage: string | null;
+  /** True when a non-stub business_analysis audit exists on the campaign. */
+  hasRealAudit: boolean;
+}
+
+export interface TemplatedDescriptionSeed {
+  id: string;
+  tenantId: string;
+  listingId: string;
+  slug: string | null;
+  businessName: string;
+  category: string;
+  city: string;
+  state: string;
+  status: string;
+  seedBatch: string;
+  description: string;
+  /** Provenance stamp on the description row — the template lanes are
+   *  seed_seo_composer / market_enrichment / linked_campaign /
+   *  intelligence_profile; null when no provenance row exists. */
+  descriptionSource: string | null;
+  descriptionSourceAt: Date | null;
+  campaigns: TemplatedDescriptionSeedCampaign[];
+  createdAt: Date;
+  publishedAt: Date | null;
+}
+
 class DirectoryPresenceSeedService {
   /**
    * Translate a queue entry's discovery_provenance ({source, role, url,
@@ -473,6 +509,145 @@ class DirectoryPresenceSeedService {
       pendingOwnerProposals: Array.isArray(s.owner_proposed_categories)
         ? s.owner_proposed_categories.filter((p: any) => p?.status === 'pending').length
         : 0,
+    }));
+  }
+
+  /**
+   * Seeds whose public listing description is still the composer's
+   * deterministic template ("<name> is a <category> …") rather than an
+   * analyst narrative or human-authored copy — the cohort an operator
+   * enriches by spawning a business-scope campaign and running a
+   * business_analysis audit on it (the post-audit resharpen recomposes
+   * description/keywords/same_as from the audit).
+   *
+   * Templated means any of:
+   *   - the description provenance row is stamped by a pure-template lane
+   *     (seed_seo_composer, market_enrichment, linked_campaign,
+   *     intelligence_profile)
+   *   - the listing carries a description with no provenance row at all
+   *   - the stored copy is still literal template shape ("<name> is a|an …"
+   *     + the disclosure suffix) even though an audit lane stamped it —
+   *     a real audit without a public_narrative leaves template text behind
+   *
+   * Operator overrides (provenance override_by) and owner/retired seeds
+   * (claimed/suppressed — the resharpen skips them anyway) are excluded.
+   */
+  async listTemplatedDescriptionSeeds(filters?: {
+    status?: string;
+    city?: string;
+    state?: string;
+    category?: string;
+    seedBatch?: string;
+  }): Promise<TemplatedDescriptionSeed[]> {
+    const conditions: string[] = [
+      `dps.status IS DISTINCT FROM 'claimed'`,
+      `dps.status IS DISTINCT FROM 'suppressed'`,
+      `dl.description IS NOT NULL`,
+      `dfp.override_by IS NULL`,
+      `(
+        dfp.source_name IN ('seed_seo_composer', 'market_enrichment', 'linked_campaign', 'intelligence_profile')
+        OR dfp.seed_id IS NULL
+        OR (
+          dl.business_name IS NOT NULL
+          AND (
+            lower(left(dl.description, length(dl.business_name) + 6)) = lower(dl.business_name) || ' is a '
+            OR lower(left(dl.description, length(dl.business_name) + 7)) = lower(dl.business_name) || ' is an '
+          )
+          AND right(dl.description, $1::int) = $2
+        )
+      )`,
+    ];
+    const params: any[] = [DISCLOSURE_SENTENCE.length, DISCLOSURE_SENTENCE];
+    let paramIdx = 3;
+
+    if (filters?.status) {
+      conditions.push(`dps.status = $${paramIdx++}`);
+      params.push(filters.status);
+    }
+    if (filters?.city) {
+      conditions.push(`dps.city ILIKE $${paramIdx++}`);
+      params.push(`%${filters.city}%`);
+    }
+    if (filters?.state) {
+      conditions.push(`dps.state ILIKE $${paramIdx++}`);
+      params.push(`%${filters.state}%`);
+    }
+    if (filters?.category) {
+      conditions.push(`dps.category ILIKE $${paramIdx++}`);
+      params.push(`%${filters.category}%`);
+    }
+    if (filters?.seedBatch) {
+      conditions.push(`dps.seed_batch = $${paramIdx++}`);
+      params.push(filters.seedBatch);
+    }
+
+    const seeds = await prisma.$queryRawUnsafe<any[]>(`
+      SELECT
+        dps.id,
+        dps.tenant_id,
+        dps.listing_id,
+        dps.category,
+        dps.city,
+        dps.state,
+        dps.status,
+        dps.seed_batch,
+        dps.created_at,
+        dps.published_at,
+        dl.business_name,
+        dl.slug,
+        dl.description,
+        dfp.source_name AS description_source,
+        dfp.updated_at AS description_source_at,
+        COALESCE((
+          SELECT json_agg(link_row.campaign ORDER BY link_row.sort_key)
+          FROM (
+            SELECT
+              CASE l.link_role WHEN 'primary' THEN 0 WHEN 'sibling' THEN 1 ELSE 2 END AS sort_key,
+              json_build_object(
+                'id', c.id,
+                'displayId', c.display_id,
+                'title', c.title,
+                'scope', c.scope,
+                'linkRole', l.link_role,
+                'stage', c.stage,
+                'hasRealAudit', EXISTS (
+                  SELECT 1 FROM mkt_audits_list a
+                  WHERE a.campaign_id = c.id
+                    AND a.platform = 'business_analysis'
+                    AND COALESCE(a.audit_data->'audit_metadata'->>'source', '')
+                        NOT IN ('manual_queue', 'queue_promotion', 'derived_from_parent', 'derived_from_city_scan', 'discovery_scan')
+                )
+              ) AS campaign
+            FROM directory_seed_campaign_links l
+            JOIN mkt_campaigns_list c ON c.id = l.campaign_id
+            WHERE l.seed_id = dps.id
+          ) link_row
+        ), '[]'::json) AS campaigns
+      FROM directory_presence_seeds dps
+      JOIN directory_listings_list dl ON dl.id = dps.listing_id
+      LEFT JOIN directory_field_provenance dfp
+        ON dfp.seed_id = dps.id AND dfp.field_key = 'description'
+      WHERE ${conditions.join(' AND ')}
+      ORDER BY dps.created_at DESC
+    `, ...params);
+
+    return seeds.map((s) => ({
+      id: s.id,
+      tenantId: s.tenant_id,
+      listingId: s.listing_id,
+      slug: s.slug ?? null,
+      businessName: s.business_name,
+      category: s.category,
+      city: s.city,
+      state: s.state,
+      status: s.status,
+      seedBatch: s.seed_batch,
+      description: s.description,
+      descriptionSource: s.description_source ?? null,
+      descriptionSourceAt: s.description_source_at ? new Date(s.description_source_at) : null,
+      campaigns: Array.isArray(s.campaigns) ? s.campaigns : [],
+      createdAt: new Date(s.created_at),
+      publishedAt: s.published_at ? new Date(s.published_at) : null,
     }));
   }
 

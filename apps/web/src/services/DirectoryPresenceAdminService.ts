@@ -381,6 +381,37 @@ export interface DirectoryPresenceSeedSummary {
   pendingOwnerProposals?: number;
 }
 
+/** A linked campaign on the templated-description worklist row. */
+export interface TemplatedSeedCampaign {
+  id: string;
+  displayId: string | null;
+  title: string | null;
+  scope: string | null;
+  linkRole: 'primary' | 'sibling' | 'recovery';
+  stage: string | null;
+  /** True when a non-stub business_analysis audit exists on the campaign. */
+  hasRealAudit: boolean;
+}
+
+export interface TemplatedDescriptionSeed {
+  id: string;
+  tenantId: string;
+  listingId: string;
+  slug: string | null;
+  businessName: string;
+  category: string;
+  city: string;
+  state: string;
+  status: string;
+  seedBatch: string;
+  description: string;
+  descriptionSource: string | null;
+  descriptionSourceAt: string | null;
+  campaigns: TemplatedSeedCampaign[];
+  createdAt: string;
+  publishedAt: string | null;
+}
+
 export interface DirectoryPresenceSeedDetail {
   seed: any;
   listing: any;
@@ -1222,6 +1253,35 @@ export class DirectoryPresenceAdminService extends AdminApiSingleton {
     const qs = params.toString();
     const result = await this.makeDefaultRequest<any>(
       `/api/admin/directory-presence/presence-seeds${qs ? `?${qs}` : ''}`,
+      { method: 'GET' },
+      undefined,
+      0,
+    );
+    if (!result.success) return [];
+    const data = result.data?.data ?? result.data;
+    return (data as any)?.seeds ?? [];
+  }
+
+  /** GET /api/admin/directory-presence/presence-seeds/templated-descriptions
+   *  Worklist of live seeds still showing the composer's template
+   *  description — enrich by spawning a business-scope campaign (spawnCampaignFromSeed)
+   *  and running a business_analysis audit on it. */
+  async listTemplatedDescriptionSeeds(filters?: {
+    status?: string;
+    city?: string;
+    state?: string;
+    category?: string;
+    seedBatch?: string;
+  }): Promise<TemplatedDescriptionSeed[]> {
+    const params = new URLSearchParams();
+    if (filters?.status) params.set('status', filters.status);
+    if (filters?.city) params.set('city', filters.city);
+    if (filters?.state) params.set('state', filters.state);
+    if (filters?.category) params.set('category', filters.category);
+    if (filters?.seedBatch) params.set('seedBatch', filters.seedBatch);
+    const qs = params.toString();
+    const result = await this.makeDefaultRequest<any>(
+      `/api/admin/directory-presence/presence-seeds/templated-descriptions${qs ? `?${qs}` : ''}`,
       { method: 'GET' },
       undefined,
       0,
