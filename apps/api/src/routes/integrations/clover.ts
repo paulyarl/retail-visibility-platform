@@ -2284,4 +2284,62 @@ router.get('/:tenantId/clover/sync-history', authenticateToken, checkTenantAcces
   }
 });
 
+/**
+ * Proxy a Clover v3 API call through the integration's stored token.
+ * Operator/debug surface — path is whitelisted to this merchant's own
+ * v3 namespace; never an open proxy.
+ *
+ * POST /:tenantId/clover/proxy
+ * body: { method: 'GET'|'POST'|'PUT'|'DELETE', path: 'v3/merchants/{mid}/...', body?: any }
+ */
+router.post('/:tenantId/clover/proxy', authenticateToken, checkTenantAccess, requireTierFeature('integration_clover'), async (req: Request, res: Response) => {
+  try {
+    const { tenantId } = req.params;
+    const { method = 'GET', path, body } = req.body || {};
+
+    const integration = await prisma.clover_integrations_list.findFirst({
+      where: { tenant_id: tenantId, mode: 'production', status: 'active' }
+    });
+    if (!integration?.access_token || !integration.merchant_id) {
+      return res.status(404).json({ error: 'integration_not_found', message: 'No active Clover integration for this tenant' });
+    }
+
+    const methodUp = String(method).toUpperCase();
+    if (!['GET', 'POST', 'PUT', 'DELETE'].includes(methodUp)) {
+      return res.status(400).json({ error: 'invalid_method' });
+    }
+
+    const prefix = `v3/merchants/${integration.merchant_id}/`;
+    const normalized = String(path || '').replace(/^\/+/, '');
+    if (!normalized.startsWith(prefix) || normalized.includes('..')) {
+      return res.status(400).json({
+        error: 'invalid_path',
+        message: `path must start with ${prefix}`
+      });
+    }
+
+    const apiBase = process.env.CLOVER_ENVIRONMENT === 'production'
+      ? 'https://api.clover.com'
+      : 'https://sandbox.dev.clover.com';
+
+    const upstream = await fetch(`${apiBase}/${normalized}`, {
+      method: methodUp,
+      headers: {
+        'Authorization': `Bearer ${integration.access_token}`,
+        'Content-Type': 'application/json'
+      },
+      body: ['POST', 'PUT'].includes(methodUp) && body !== undefined ? JSON.stringify(body) : undefined
+    });
+
+    const text = await upstream.text();
+    let parsed: any = text;
+    try { parsed = JSON.parse(text); } catch { /* leave raw */ }
+
+    return res.json({ status: upstream.status, body: parsed });
+  } catch (error: any) {
+    logger.error('[POST /clover/proxy] Error:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    return res.status(500).json({ error: 'internal_error', message: error.message });
+  }
+});
+
 export default router;
