@@ -16,7 +16,12 @@ import { prisma } from '../prisma';
 import { logger } from '../logger';
 import { upsertLocalInventoryForItem } from './MerchantProductSync';
 
-export type PosStockSource = 'clover_poll' | 'clover_webhook' | 'square_poll';
+export type PosStockSource =
+  | 'clover_poll'
+  | 'clover_webhook'
+  | 'square_poll'
+  /** File-path ingestion (NRS pricebook etc.) — POS_INGESTION_PARTNER_PATH_SPEC. */
+  | 'file_import';
 
 export interface PosStockDiff {
   inventoryItemId: string;
