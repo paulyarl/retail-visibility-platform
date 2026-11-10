@@ -307,6 +307,31 @@ export class IntegrationService extends TenantApiSingleton {
   }
 
   /**
+   * Proxy a Clover v3 API call through the integration's stored token
+   */
+  async callCloverProxy(tenantId: string, method: string, path: string, body?: any): Promise<any> {
+    if (!tenantId) {
+      throw new Error('Tenant ID is required');
+    }
+
+    const result = await this.makeDefaultRequest<any>(
+      `/api/integrations/${tenantId}/clover/proxy`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ method, path, body })
+      },
+      `platform-clover-proxy-${tenantId}`
+    );
+
+    if (!result.success) {
+      clientLogger.error('[IntegrationService] Clover proxy call failed:', { detail: result.error });
+      throw result.error;
+    }
+
+    return result.data;
+  }
+
+  /**
    * Get Clover demo scenarios
    */
   async getCloverDemoScenarios(tenantId: string): Promise<any> {
