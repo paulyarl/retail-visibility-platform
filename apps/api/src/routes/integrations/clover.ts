@@ -24,6 +24,7 @@ import {
   decodeState,
   exchangeCodeForToken,
   encryptToken,
+  decryptToken,
   calculateTokenExpiration,
   formatScopesForDisplay
 } from '../../services/clover-oauth';
@@ -1646,14 +1647,14 @@ async function fetchCloverInventory(integration: any): Promise<{ categories: any
       // Fetch categories from Clover
       const categoriesResponse = await fetch(
         `https://api.clover.com/v3/merchants/${integration.merchant_id}/categories`,
-        { headers: { 'Authorization': `Bearer ${integration.access_token}` } }
+        { headers: { 'Authorization': `Bearer ${decryptToken(integration.access_token)}` } }
       );
       const categoriesData = await categoriesResponse.json() as { elements?: any[] };
       
       // Fetch items from Clover
       const itemsResponse = await fetch(
         `https://api.clover.com/v3/merchants/${integration.merchant_id}/items?expand=categories`,
-        { headers: { 'Authorization': `Bearer ${integration.access_token}` } }
+        { headers: { 'Authorization': `Bearer ${decryptToken(integration.access_token)}` } }
       );
       const itemsData = await itemsResponse.json() as { elements?: any[] };
       
@@ -2326,7 +2327,7 @@ router.post('/:tenantId/clover/proxy', authenticateToken, checkTenantAccess, req
     const upstream = await fetch(`${apiBase}/${normalized}`, {
       method: methodUp,
       headers: {
-        'Authorization': `Bearer ${integration.access_token}`,
+        'Authorization': `Bearer ${decryptToken(integration.access_token)}`,
         'Content-Type': 'application/json'
       },
       body: ['POST', 'PUT'].includes(methodUp) && body !== undefined ? JSON.stringify(body) : undefined
