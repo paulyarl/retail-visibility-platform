@@ -1897,6 +1897,11 @@ router.post('/:tenantId/clover/sync', authenticateToken, checkTenantAccess, requ
               tenant_id: tenantId,
               sku: cloverItem.sku || cloverItem.id,
               name: cloverItem.name,
+              title: cloverItem.name,
+              brand: 'Clover Import',
+              seo_keywords: [],
+              tags: [],
+              features: [],
               price_cents: cloverItem.price,
               price: (cloverItem.price || 0) / 100,
               sale_price_cents: cloverItem.salePrice || null,
@@ -1946,7 +1951,8 @@ router.post('/:tenantId/clover/sync', authenticateToken, checkTenantAccess, requ
       } catch (itemError) {
         logger.error(`[Clover Sync] Failed to sync item ${cloverItem.name}:`, req.ctx, { error: { name: (itemError as any)?.name || 'Error', message: (itemError as any)?.message || String(itemError), stack: (itemError as any)?.stack } });
         itemsFailed++;
-        itemErrorDetails.push(`${cloverItem.name}: ${(itemError as any)?.message || String(itemError)}`.slice(0, 300));
+        const errMsg = String((itemError as any)?.message || itemError);
+        itemErrorDetails.push(`${cloverItem.name}: …${errMsg.slice(-400)}`);
       }
     }
 
