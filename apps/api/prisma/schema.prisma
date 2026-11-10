@@ -8850,6 +8850,18 @@ model linkedin_surface_connections {
   @@index([linkedin_oauth_account_id], map: "idx_linkedin_surfaces_account")
 }
 
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model pos_dirty_items {
+  id             String    @id
+  provider       String
+  integration_id String
+  pos_item_id    String?
+  queued_at      DateTime  @default(now()) @db.Timestamptz(6)
+  flushed_at     DateTime? @db.Timestamptz(6)
+
+  @@index([queued_at], map: "idx_pos_dirty_items_queued_at")
+}
+
 enum action {
   create
   update

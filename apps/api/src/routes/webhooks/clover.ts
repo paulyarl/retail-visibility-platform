@@ -31,7 +31,7 @@ function verifyCloverSignature(rawBody: Buffer, signature: string, secret: strin
 
 router.post(
   '/',
-  express.raw({ type: 'application/json' }),
+  express.raw({ type: () => true }),
   async (req: Request, res: Response) => {
     const secret = process.env.CLOVER_WEBHOOK_SECRET;
     if (!secret) {
@@ -41,7 +41,19 @@ router.post(
 
     const signature = req.headers['x-clover-auth'] as string | undefined;
     const rawBody = req.body as Buffer;
-    if (!signature || !Buffer.isBuffer(rawBody) || !verifyCloverSignature(rawBody, signature, secret)) {
+    const rawText = Buffer.isBuffer(rawBody) ? rawBody.toString('utf8') : '';
+
+    if (!signature) {
+      // Unsigned POST — Clover's URL-verification ping arrives without an
+      // X-Clover-Auth signature. Acknowledge it (the dashboard needs a 200)
+      // but never enqueue anything: an unsigned request can carry no
+      // trustworthy event data.
+      logger.info('[Clover Webhook] unsigned request (verification ping)', undefined, {
+        bodyPreview: rawText.slice(0, 200),
+      });
+      return res.json({ success: true, verified: true });
+    }
+    if (!verifyCloverSignature(rawBody, signature, secret)) {
       logger.warn('[Clover Webhook] signature verification failed', undefined);
       return res.status(401).json({ success: false, error: 'invalid_signature' });
     }
