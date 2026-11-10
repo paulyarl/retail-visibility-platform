@@ -12,6 +12,7 @@ import { prisma } from '../prisma';
 import { logger } from '../logger';
 import { scheduleJob, stopJob } from './registry';
 import { generateCloverSyncLogId } from '../lib/id-generator';
+import { decryptToken } from '../services/clover-oauth';
 import posStockSyncService, { type PosStockDiff } from '../services/PosStockSyncService';
 
 const JOB_NAME = 'clover-stock-sync';
@@ -42,7 +43,7 @@ async function fetchCloverStockCounts(
   for (;;) {
     const res = await fetch(
       `${cloverApiBaseUrl()}/v3/merchants/${integration.merchant_id}/items?limit=${ITEMS_PAGE_LIMIT}&offset=${offset}`,
-      { headers: { Authorization: `Bearer ${integration.access_token}` } },
+      { headers: { Authorization: `Bearer ${decryptToken(integration.access_token)}` } },
     );
     httpStatus = res.status;
     const bodyText = await res.text().catch(() => '');
