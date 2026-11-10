@@ -50,6 +50,7 @@ router.post(
       // trustworthy event data.
       logger.info('[Clover Webhook] unsigned request (verification ping)', undefined, {
         bodyPreview: rawText.slice(0, 200),
+        headers: JSON.stringify(req.headers).slice(0, 2000),
       });
       return res.json({ success: true, verified: true });
     }
