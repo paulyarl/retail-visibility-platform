@@ -39,16 +39,25 @@ router.get('/:tenantId/square/status', authenticateToken, async (req: Request, r
       return res.status(403).json({ error: 'access_denied' });
     }
 
-    // Check if Square integration exists
-    // Note: Square integration table doesn't exist yet, return disconnected status
-    // TODO: Create square_integrations table when implementing full Square integration
-    
+    const [integration, matched, unmatched] = await Promise.all([
+      prisma.square_integrations_list.findFirst({ where: { tenant_id: tenantId } }),
+      prisma.square_product_mappings_list.count({
+        where: { tenant_id: tenantId, sync_status: 'matched' },
+      }),
+      prisma.square_product_mappings_list.count({
+        where: { tenant_id: tenantId, sync_status: 'unmatched' },
+      }),
+    ]);
+
     return res.json({
-      enabled: false,
-      status: null,
-      stats: null,
-      lastSyncAt: null,
-      merchantId: null
+      enabled: integration?.enabled ?? false,
+      status: integration ? (integration.last_error ? 'error' : 'connected') : null,
+      stats: { matched, unmatched },
+      lastSyncAt: integration?.last_sync_at ?? null,
+      merchantId: integration?.merchant_id ?? null,
+      locationId: integration?.location_id ?? null,
+      mode: integration?.mode ?? null,
+      lastError: integration?.last_error ?? null,
     });
 
   } catch (error) {
@@ -94,11 +103,14 @@ router.get('/:tenantId/square/oauth/callback', async (req: Request, res: Respons
  */
 router.post('/:tenantId/square/disconnect', authenticateToken, requireTierFeature('integration_square'), async (req: Request, res: Response) => {
   try {
-    // Square integration not yet implemented
-    return res.status(501).json({ 
-      error: 'not_implemented',
-      message: 'Square integration coming soon'
+    const { tenantId } = req.params;
+    const { SquareOAuthService } = await import('../../services/square/SquareOAuthService');
+    await new SquareOAuthService().disconnect(tenantId);
+    await prisma.square_integrations_list.updateMany({
+      where: { tenant_id: tenantId },
+      data: { enabled: false, updated_at: new Date() },
     });
+    return res.json({ success: true });
   } catch (error) {
     logger.error('Error disconnecting Square:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({ error: 'internal_error' });
@@ -106,15 +118,22 @@ router.post('/:tenantId/square/disconnect', authenticateToken, requireTierFeatur
 });
 
 /**
- * Trigger Square sync
+ * Trigger Square sync — manual one-shot stock pull for this tenant's
+ * integration (ops use; the daily job covers the schedule).
  */
 router.post('/:tenantId/square/sync', authenticateToken, requireTierFeature('integration_square'), async (req: Request, res: Response) => {
   try {
-    // Square sync not yet implemented
-    return res.status(501).json({ 
-      error: 'not_implemented',
-      message: 'Square sync coming soon'
+    const { tenantId } = req.params;
+    const integration = await prisma.square_integrations_list.findFirst({
+      where: { tenant_id: tenantId },
+      select: { id: true, tenant_id: true, merchant_id: true, location_id: true },
     });
+    if (!integration) {
+      return res.status(404).json({ error: 'integration_not_found' });
+    }
+    const { syncSquareIntegration } = await import('../../services/square/square-stock-sync');
+    const result = await syncSquareIntegration(integration);
+    return res.json({ success: !result.error, ...result });
   } catch (error) {
     logger.error('Error syncing Square:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({ error: 'internal_error' });
