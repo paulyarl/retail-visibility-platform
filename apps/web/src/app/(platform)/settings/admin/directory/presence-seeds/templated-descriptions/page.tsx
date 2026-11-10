@@ -556,9 +556,18 @@ function TemplatedSeedCard({
           </Link>
         ))}
 
+        {primaryBusiness && (
+          <Link
+            href={`/settings/admin/marketing-ops/campaigns/${primaryBusiness.id}`}
+            className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-700"
+          >
+            <ArrowUpRight className="h-3.5 w-3.5" />
+            Open audit campaign
+          </Link>
+        )}
         {primaryBusiness && !primaryBusiness.hasRealAudit && (
           <span className="rounded bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700 dark:bg-blue-900/40 dark:text-blue-300">
-            audit campaign ready — run the business analysis on it
+            no audit yet — run the business analysis on it
           </span>
         )}
         {primaryBusiness?.hasRealAudit && (

@@ -201,6 +201,18 @@ const nextConfig: NextConfig = {
           },
         ],
       },
+      {
+        // Operator/auth area — keep it out of the index via X-Robots-Tag.
+        // Do NOT also Disallow it in robots.txt: Google has to be able to
+        // crawl these routes to see the noindex.
+        source: '/settings/:path*',
+        headers: [
+          {
+            key: 'X-Robots-Tag',
+            value: 'noindex, nofollow',
+          },
+        ],
+      },
     ];
   },
 
