@@ -12,7 +12,7 @@ import { prisma } from '../prisma';
 import { logger } from '../logger';
 import { scheduleJob, stopJob } from './registry';
 import { generateCloverSyncLogId } from '../lib/id-generator';
-import { decryptToken } from '../services/clover-oauth';
+import { cloverApiBaseUrl, decryptToken } from '../services/clover-oauth';
 import posStockSyncService, { type PosStockDiff } from '../services/PosStockSyncService';
 
 const JOB_NAME = 'clover-stock-sync';
@@ -24,12 +24,6 @@ function pollIntervalMs(): number {
   const raw = Number(process.env.POS_CLOVER_POLL_INTERVAL_MS);
   if (!Number.isFinite(raw) || raw <= 0) return DEFAULT_INTERVAL_MS;
   return Math.max(raw, MIN_INTERVAL_MS);
-}
-
-function cloverApiBaseUrl(): string {
-  // REST host — tokens issued by the sandbox OAuth flow validate against
-  // api.clover.com, not the sandbox.dev.clover.com dashboard host.
-  return process.env.CLOVER_API_BASE_URL || 'https://api.clover.com';
 }
 
 /** Paginate /v3/merchants/{id}/items → Map<cloverItemId, stockCount>. */

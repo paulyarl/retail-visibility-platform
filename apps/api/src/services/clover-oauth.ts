@@ -13,7 +13,7 @@ const CLOVER_CONFIG = {
   sandbox: {
     authUrl: 'https://sandbox.dev.clover.com/oauth/authorize',
     tokenUrl: 'https://sandbox.dev.clover.com/oauth/token',
-    apiBaseUrl: 'https://sandbox.dev.clover.com',
+    apiBaseUrl: 'https://apisandbox.dev.clover.com',
   },
   // Production
   production: {
@@ -63,6 +63,18 @@ export function getCloverConfig(): CloverOAuthConfig {
  */
 export function getCloverUrls(environment: 'sandbox' | 'production' = 'sandbox') {
   return CLOVER_CONFIG[environment];
+}
+
+/**
+ * REST host for Clover API calls. Tokens issued by the legacy sandbox OAuth
+ * flow (sandbox.dev.clover.com) only validate against
+ * apisandbox.dev.clover.com — api.clover.com is for production tokens and
+ * new-model test merchants created on the prod dashboard.
+ * CLOVER_API_BASE_URL overrides for one-off tests.
+ */
+export function cloverApiBaseUrl(): string {
+  if (process.env.CLOVER_API_BASE_URL) return process.env.CLOVER_API_BASE_URL;
+  return getCloverUrls(getCloverConfig().environment).apiBaseUrl;
 }
 
 /**

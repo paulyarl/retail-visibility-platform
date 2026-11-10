@@ -25,6 +25,7 @@ import {
   exchangeCodeForToken,
   encryptToken,
   decryptToken,
+  cloverApiBaseUrl,
   calculateTokenExpiration,
   formatScopesForDisplay
 } from '../../services/clover-oauth';
@@ -1646,14 +1647,14 @@ async function fetchCloverInventory(integration: any): Promise<{ categories: any
       
       // Fetch categories from Clover
       const categoriesResponse = await fetch(
-        `https://api.clover.com/v3/merchants/${integration.merchant_id}/categories`,
+        `${cloverApiBaseUrl()}/v3/merchants/${integration.merchant_id}/categories`,
         { headers: { 'Authorization': `Bearer ${decryptToken(integration.access_token)}` } }
       );
       const categoriesData = await categoriesResponse.json() as { elements?: any[] };
       
       // Fetch items from Clover
       const itemsResponse = await fetch(
-        `https://api.clover.com/v3/merchants/${integration.merchant_id}/items?expand=categories`,
+        `${cloverApiBaseUrl()}/v3/merchants/${integration.merchant_id}/items?expand=categories`,
         { headers: { 'Authorization': `Bearer ${decryptToken(integration.access_token)}` } }
       );
       const itemsData = await itemsResponse.json() as { elements?: any[] };
@@ -2319,10 +2320,9 @@ router.post('/:tenantId/clover/proxy', authenticateToken, checkTenantAccess, req
       });
     }
 
-    // Tokens issued by the sandbox OAuth flow validate against api.clover.com
-    // (the REST host), not sandbox.dev.clover.com (the dashboard host) —
-    // matches fetchCloverInventory, which successfully reads items this way.
-    const apiBase = process.env.CLOVER_API_BASE_URL || 'https://api.clover.com';
+    // Environment-aware REST host — legacy-sandbox tokens only validate
+    // against apisandbox.dev.clover.com (see clover-oauth.ts).
+    const apiBase = cloverApiBaseUrl();
 
     const upstream = await fetch(`${apiBase}/${normalized}`, {
       method: methodUp,
