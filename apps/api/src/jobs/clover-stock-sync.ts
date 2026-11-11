@@ -26,7 +26,11 @@ function pollIntervalMs(): number {
   return Math.max(raw, MIN_INTERVAL_MS);
 }
 
-/** Paginate /v3/merchants/{id}/items → Map<cloverItemId, stockCount>. */
+/**
+ * Paginate /v3/merchants/{id}/item_stocks → Map<cloverItemId, stockCount>.
+ * item_stocks is Clover's authoritative stock source — the stockCount field
+ * on /items is denormalized and reads 0 for stock-tracked items.
+ */
 async function fetchCloverStockCounts(
   integration: { merchant_id: string; access_token: string },
 ): Promise<{ stockByItemId: Map<string, number>; httpStatus: number | null }> {
@@ -36,41 +40,41 @@ async function fetchCloverStockCounts(
 
   for (;;) {
     const res = await fetch(
-      `${cloverApiBaseUrl()}/v3/merchants/${integration.merchant_id}/items?limit=${ITEMS_PAGE_LIMIT}&offset=${offset}`,
+      `${cloverApiBaseUrl()}/v3/merchants/${integration.merchant_id}/item_stocks?limit=${ITEMS_PAGE_LIMIT}&offset=${offset}`,
       { headers: { Authorization: `Bearer ${decryptToken(integration.access_token)}` } },
     );
     httpStatus = res.status;
     const bodyText = await res.text().catch(() => '');
     if (!res.ok) {
-      logger.warn('[clover-stock-sync] items fetch failed', undefined, {
+      logger.warn('[clover-stock-sync] item_stocks fetch failed', undefined, {
         merchantId: integration.merchant_id,
         httpStatus: res.status,
         body: bodyText.slice(0, 500),
       });
-      throw Object.assign(new Error(`clover_items_${res.status}`), {
+      throw Object.assign(new Error(`clover_item_stocks_${res.status}`), {
         httpStatus: res.status,
         body: bodyText.slice(0, 500),
       });
     }
-    let data: { elements?: Array<{ id?: string; stockCount?: number }> } = {};
+    let data: { elements?: Array<{ item?: { id?: string }; stockCount?: number }> } = {};
     try {
       data = JSON.parse(bodyText);
     } catch {
-      logger.warn('[clover-stock-sync] non-JSON items response', undefined, {
+      logger.warn('[clover-stock-sync] non-JSON item_stocks response', undefined, {
         merchantId: integration.merchant_id,
         body: bodyText.slice(0, 500),
       });
     }
     const elements = data.elements || [];
     if (elements.length === 0) {
-      logger.warn('[clover-stock-sync] empty items payload', undefined, {
+      logger.warn('[clover-stock-sync] empty item_stocks payload', undefined, {
         merchantId: integration.merchant_id,
         httpStatus: res.status,
         body: bodyText.slice(0, 500),
       });
     }
     for (const el of elements) {
-      if (el.id) stockByItemId.set(el.id, el.stockCount ?? 0);
+      if (el.item?.id) stockByItemId.set(el.item.id, el.stockCount ?? 0);
     }
     if (elements.length < ITEMS_PAGE_LIMIT) break;
     offset += ITEMS_PAGE_LIMIT;

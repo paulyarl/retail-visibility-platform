@@ -1707,7 +1707,26 @@ async function fetchCloverInventory(integration: any): Promise<{ categories: any
         throw new Error(`clover_items_${itemsResponse.status}: ${(await itemsResponse.text()).slice(0, 200)}`);
       }
       const itemsData = await itemsResponse.json() as { elements?: any[] };
-      
+
+      // item_stocks is Clover's authoritative stock source — the stockCount
+      // field on /items is denormalized and reads 0 for stock-tracked items.
+      const stocksResponse = await fetch(
+        `${cloverApiBaseUrl()}/v3/merchants/${integration.merchant_id}/item_stocks`,
+        { headers: authHeaders }
+      );
+      const stockByItemId = new Map<string, number>();
+      if (stocksResponse.ok) {
+        const stocksData = await stocksResponse.json() as { elements?: Array<{ item?: { id?: string }; stockCount?: number }> };
+        for (const el of stocksData.elements || []) {
+          if (el.item?.id) stockByItemId.set(el.item.id, el.stockCount ?? 0);
+        }
+      } else {
+        logger.warn('[Clover Sync] item_stocks fetch failed — stock counts may be stale', undefined, {
+          merchantId: integration.merchant_id,
+          httpStatus: stocksResponse.status,
+        });
+      }
+
       // Transform Clover API response to our format
       const categories = (categoriesData.elements || []).map((cat: any) => ({
         id: cat.id,
@@ -1722,7 +1741,7 @@ async function fetchCloverInventory(integration: any): Promise<{ categories: any
         sku: item.sku || item.code || `CLV-${item.id.substring(0, 8)}`,
         price: item.price || 0,
         salePrice: item.priceType === 'VARIABLE' ? null : (item.alternatePrices?.[0]?.price || null), // Clover sale price
-        stockCount: item.stockCount || 0,
+        stockCount: stockByItemId.get(item.id) ?? item.stockCount ?? 0,
         categoryId: item.categories?.elements?.[0]?.id || null
       }));
       
