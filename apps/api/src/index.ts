@@ -111,6 +111,18 @@ if (process.env.NODE_ENV !== "test") {
       logger.info(`API server running → http://localhost:${port}/health`);
       logger.info(`View all routes → http://localhost:${port}/__routes`);
 
+      // Standby deployments serve API traffic but must not run batch jobs —
+      // every job (registry-instrumented and self-scheduled alike) is skipped
+      // when BATCH_JOBS_ENABLED=false. Failover = repoint the domain + flip
+      // the var to true on the standby.
+      {
+        const { batchJobsEnabled } = await import('./jobs/registry');
+        if (!batchJobsEnabled()) {
+          logger.info('BATCH_JOBS_ENABLED=false — standby mode, scheduled jobs will not start');
+          return;
+        }
+      }
+
       // Register the scheduled-job catalog with the JobRegistry so every job is
       // visible in the admin Scheduled Jobs UI. Jobs migrated to scheduleJob()
       // get full run tracking; the rest show as declared (not instrumented).

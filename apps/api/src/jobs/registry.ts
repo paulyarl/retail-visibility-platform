@@ -82,6 +82,16 @@ type RunStatus = 'running' | 'success' | 'failed' | 'skipped';
 const jobs = new Map<string, RegisteredJob>();
 const HOSTNAME = `${os.hostname()}:${process.pid}`;
 
+/**
+ * Server-level batch gate. `BATCH_JOBS_ENABLED=false` marks a standby
+ * deployment that must not run scheduled work — failover is domain repoint
+ * + flip this to true. Unset means enabled, so every env that never set it
+ * keeps today's behavior; only an explicit 'false' suppresses jobs.
+ */
+export function batchJobsEnabled(): boolean {
+  return process.env.BATCH_JOBS_ENABLED !== 'false';
+}
+
 /** Cross-instance job lock (Redis SET NX PX). Bounds a dead holder's lease;
  *  jobs exceeding this could double-run, so it should outlive the longest run. */
 const JOB_LOCK_TTL_MS = 30 * 60 * 1000;
@@ -297,7 +307,8 @@ function armTimer(job: RegisteredJob): void {
 export function scheduleJob(opts: ScheduleJobOptions): void {
   ensureConsolePatched();
 
-  const envDisabled = !!(opts.envDisableVar && process.env[opts.envDisableVar] === 'true');
+  const envDisabled = !batchJobsEnabled()
+    || !!(opts.envDisableVar && process.env[opts.envDisableVar] === 'true');
   const job: RegisteredJob = {
     name: opts.name,
     description: opts.description,
@@ -317,7 +328,7 @@ export function scheduleJob(opts: ScheduleJobOptions): void {
   jobs.set(opts.name, job);
 
   if (envDisabled) {
-    logger.info(`[JobRegistry] ${opts.name} disabled by ${opts.envDisableVar}`);
+    logger.info(`[JobRegistry] ${opts.name} disabled by ${!batchJobsEnabled() ? 'BATCH_JOBS_ENABLED=false (standby)' : opts.envDisableVar}`);
     void seedJobRow(job);
     return;
   }
