@@ -2451,12 +2451,14 @@ router.get('/:tenantId/clover/sync-history', authenticateToken, checkTenantAcces
  * v3 namespace; never an open proxy.
  *
  * POST /:tenantId/clover/proxy
- * body: { method: 'GET'|'POST'|'PUT'|'DELETE', path: 'v3/merchants/{mid}/...', body?: any }
+ * body: { method: 'GET', path: 'v3/merchants/{mid}/...' }
+ * Read-only by design — the app requests Clover read scopes only
+ * (inventory_r + merchant_r), so write methods are not permitted.
  */
 router.post('/:tenantId/clover/proxy', authenticateToken, checkTenantAccess, requireTierFeature('integration_clover'), async (req: Request, res: Response) => {
   try {
     const { tenantId } = req.params;
-    const { method = 'GET', path, body } = req.body || {};
+    const { method = 'GET', path } = req.body || {};
 
     const integration = await prisma.clover_integrations_list.findFirst({
       where: { tenant_id: tenantId, mode: 'production', status: 'active' }
@@ -2466,8 +2468,8 @@ router.post('/:tenantId/clover/proxy', authenticateToken, checkTenantAccess, req
     }
 
     const methodUp = String(method).toUpperCase();
-    if (!['GET', 'POST', 'PUT', 'DELETE'].includes(methodUp)) {
-      return res.status(400).json({ error: 'invalid_method' });
+    if (methodUp !== 'GET') {
+      return res.status(400).json({ error: 'invalid_method', message: 'Clover explorer proxy is read-only (GET only)' });
     }
 
     const prefix = `v3/merchants/${integration.merchant_id}/`;
@@ -2484,12 +2486,10 @@ router.post('/:tenantId/clover/proxy', authenticateToken, checkTenantAccess, req
     const apiBase = cloverApiBaseUrl();
 
     const upstream = await fetch(`${apiBase}/${normalized}`, {
-      method: methodUp,
+      method: 'GET',
       headers: {
-        'Authorization': `Bearer ${decryptToken(integration.access_token)}`,
-        'Content-Type': 'application/json'
-      },
-      body: ['POST', 'PUT'].includes(methodUp) && body !== undefined ? JSON.stringify(body) : undefined
+        'Authorization': `Bearer ${decryptToken(integration.access_token)}`
+      }
     });
 
     const text = await upstream.text();

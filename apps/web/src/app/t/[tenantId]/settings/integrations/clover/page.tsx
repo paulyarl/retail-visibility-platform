@@ -157,9 +157,7 @@ export default function CloverIntegrationPage() {
   const [actionLoading, setActionLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'overview' | 'simulate' | 'mappings' | 'history' | 'explorer'>('overview');
-  const [proxyMethod, setProxyMethod] = useState<'GET' | 'POST' | 'PUT' | 'DELETE'>('GET');
   const [proxyPath, setProxyPath] = useState('');
-  const [proxyBody, setProxyBody] = useState('');
   const [proxyResult, setProxyResult] = useState<string | null>(null);
   const [proxyLoading, setProxyLoading] = useState(false);
 
@@ -1189,21 +1187,25 @@ export default function CloverIntegrationPage() {
             <div className="space-y-4">
               <div className="bg-white dark:bg-neutral-900 rounded-lg border border-neutral-200 dark:border-neutral-700 p-6">
                 <h3 className="text-lg font-semibold mb-1">Clover API Explorer</h3>
-                <p className="text-sm text-neutral-500 dark:text-neutral-400 mb-4">
+                <p className="text-sm text-neutral-500 dark:text-neutral-400 mb-1">
                   Calls the Clover v3 API with this integration's stored token. Paths must start with{' '}
                   <code className="text-xs">v3/merchants/{status?.merchantId || '{merchantId}'}/</code>
+                </p>
+                <p className="text-xs text-neutral-400 dark:text-neutral-500 mb-4">
+                  Read-only — this app holds Clover's Inventory and Merchant read permissions only. Endpoints
+                  requiring other scopes (orders, payments, customers) return 401 from Clover by design.
                 </p>
 
                 <div className="flex flex-wrap gap-2 mb-4">
                   {[
-                    { label: 'List items', method: 'GET' as const, path: `v3/merchants/${status?.merchantId || ''}/items?limit=100` },
-                    { label: 'Item stocks', method: 'GET' as const, path: `v3/merchants/${status?.merchantId || ''}/item_stocks` },
-                    { label: 'Categories', method: 'GET' as const, path: `v3/merchants/${status?.merchantId || ''}/categories` },
-                    { label: 'Orders', method: 'GET' as const, path: `v3/merchants/${status?.merchantId || ''}/orders?limit=20` },
+                    { label: 'List items', path: `v3/merchants/${status?.merchantId || ''}/items?limit=100` },
+                    { label: 'Item stocks', path: `v3/merchants/${status?.merchantId || ''}/item_stocks` },
+                    { label: 'Categories', path: `v3/merchants/${status?.merchantId || ''}/categories` },
+                    { label: 'Merchant', path: `v3/merchants/${status?.merchantId || ''}` },
                   ].map((preset) => (
                     <button
                       key={preset.label}
-                      onClick={() => { setProxyMethod(preset.method); setProxyPath(preset.path); }}
+                      onClick={() => setProxyPath(preset.path)}
                       className="px-3 py-1.5 text-xs font-medium rounded-md bg-neutral-100 dark:bg-neutral-800 hover:bg-neutral-200 dark:hover:bg-neutral-700 border border-neutral-200 dark:border-neutral-700"
                     >
                       {preset.label}
@@ -1212,13 +1214,9 @@ export default function CloverIntegrationPage() {
                 </div>
 
                 <div className="flex gap-2 mb-3">
-                  <select
-                    value={proxyMethod}
-                    onChange={(e) => setProxyMethod(e.target.value as typeof proxyMethod)}
-                    className="px-2 py-2 text-sm rounded-md border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-800"
-                  >
-                    {['GET', 'POST', 'PUT', 'DELETE'].map((m) => <option key={m}>{m}</option>)}
-                  </select>
+                  <span className="px-2 py-2 text-sm font-mono rounded-md border border-neutral-300 dark:border-neutral-600 bg-neutral-50 dark:bg-neutral-800 text-neutral-500">
+                    GET
+                  </span>
                   <input
                     value={proxyPath}
                     onChange={(e) => setProxyPath(e.target.value)}
@@ -1227,25 +1225,13 @@ export default function CloverIntegrationPage() {
                   />
                 </div>
 
-                {(proxyMethod === 'POST' || proxyMethod === 'PUT') && (
-                  <textarea
-                    value={proxyBody}
-                    onChange={(e) => setProxyBody(e.target.value)}
-                    placeholder='{"stockCount": 33}'
-                    rows={4}
-                    className="w-full px-3 py-2 mb-3 text-sm font-mono rounded-md border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-800"
-                  />
-                )}
-
                 <Button
                   loading={proxyLoading}
                   onClick={async () => {
                     setProxyLoading(true);
                     setProxyResult(null);
                     try {
-                      let parsedBody: any = undefined;
-                      if (proxyBody.trim()) parsedBody = JSON.parse(proxyBody);
-                      const data = await integrationService.callCloverProxy(tenantId, proxyMethod, proxyPath, parsedBody);
+                      const data = await integrationService.callCloverProxy(tenantId, 'GET', proxyPath);
                       setProxyResult(JSON.stringify(data, null, 2));
                     } catch (e: any) {
                       setProxyResult(JSON.stringify({ error: e?.message || String(e) }, null, 2));
