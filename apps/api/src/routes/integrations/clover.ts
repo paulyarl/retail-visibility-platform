@@ -490,6 +490,39 @@ router.get('/:tenantId/clover/oauth/authorize', authenticateToken, checkTenantAc
 });
 
 /**
+ * Clover app launch / post-install landing.
+ * Clover sends "Open the app" and App-Market install redirects to the app's
+ * Site URL host + Alternate Launch Path — they carry merchant_id+client_id,
+ * never an OAuth code or session. Route the browser back into the tenant's
+ * integrations page with ?clover=installed so the web app auto-continues
+ * OAuth instead of stranding the merchant on an API error page.
+ *
+ * Public route — no auth (Clover launches arrive unauthenticated).
+ */
+router.get('/clover/launch', async (req: Request, res: Response) => {
+  try {
+    const merchantId = req.query.merchant_id as string | undefined;
+    let tenantId: string | null = null;
+
+    if (merchantId) {
+      const integration = await prisma.clover_integrations_list.findFirst({
+        where: { merchant_id: merchantId },
+        select: { tenant_id: true }
+      });
+      tenantId = integration?.tenant_id || null;
+    }
+
+    const target = tenantId
+      ? `${unifiedConfig.webUrl}/t/${tenantId}/settings/integrations?clover=installed`
+      : `${unifiedConfig.webUrl}/settings/integrations?clover=installed`;
+    return res.redirect(target);
+  } catch (error: any) {
+    logger.error('[GET /clover/launch] Error:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    return res.redirect(`${unifiedConfig.webUrl}`);
+  }
+});
+
+/**
  * OAuth callback handler
  * Receives authorization code from Clover and exchanges it for access token
  */
