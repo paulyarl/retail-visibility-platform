@@ -604,6 +604,31 @@ router.get('/clover/oauth/callback', async (req: Request, res: Response) => {
     });
 
     if (integration) {
+      // Demo → production is a hard transition: purge the 25 test-drive items
+      // and their mappings so a production integration never carries demo data.
+      if (integration.mode === 'demo') {
+        const demoMappings = await prisma.clover_item_mappings_list.findMany({
+          where: { integration_id: integration.id },
+          select: { id: true, rvp_item_id: true }
+        });
+        const demoItemIds = demoMappings
+          .map(m => m.rvp_item_id)
+          .filter((id): id is string => id !== null);
+
+        if (demoItemIds.length > 0) {
+          await prisma.photo_assets.deleteMany({
+            where: { inventoryItemId: { in: demoItemIds } }
+          });
+          await prisma.inventory_items.deleteMany({
+            where: { id: { in: demoItemIds } }
+          });
+        }
+        await prisma.clover_item_mappings_list.deleteMany({
+          where: { integration_id: integration.id }
+        });
+        console.log(`[Clover OAuth] Demo→production transition: purged ${demoItemIds.length} demo items for tenant ${tenantId}`);
+      }
+
       // Update existing integration to production mode
       integration = await prisma.clover_integrations_list.update({
         where: { id: integration.id },

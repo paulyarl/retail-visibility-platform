@@ -354,13 +354,16 @@ export async function batchSyncToMerchant(tenantId: string, itemIds?: string[]):
     }
 
     // Unified eligibility (spec §6.5): Google shows exactly what the public
-    // catalog shows — active + public + syncable types only.
+    // catalog shows — active + public + syncable types only. CLOVER_DEMO items
+    // are test-drive data and never reach downstream surfaces, even if a caller
+    // passes their ids directly.
     const whereClause: any = {
       tenant_id: tenantId,
       item_status: 'active',
       visibility: 'public',
       product_type: { in: [...GMC_SYNCABLE_PRODUCT_TYPES] },
       google_online_excluded: { not: true },
+      source: { not: 'CLOVER_DEMO' },
     };
     if (itemIds?.length) whereClause.id = { in: itemIds };
 
