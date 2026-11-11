@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-11-11T13:02:16.025Z",
+  "generated_at": "2026-11-11T19:42:20.702Z",
   "env": "prd",
   "tiers": [
     {
@@ -67,8 +67,8 @@
     },
     {
       "tier_key": "discovery",
-      "display_name": "SWIS",
-      "name": "SWIS",
+      "display_name": "Nearby",
+      "name": "Nearby",
       "price_monthly": 29,
       "is_active": true,
       "sort_order": 20,
@@ -184,8 +184,8 @@
     },
     {
       "tier_key": "trial_discovery",
-      "display_name": "Trial: Discovery",
-      "name": "Trial: Discovery",
+      "display_name": "Trial: Nearby",
+      "name": "Trial: Nearby",
       "price_monthly": 0,
       "is_active": true,
       "sort_order": 111,
