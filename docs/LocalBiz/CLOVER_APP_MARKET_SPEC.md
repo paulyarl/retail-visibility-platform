@@ -462,7 +462,7 @@ it is the thing Pointy cannot do for a non-barcoded item.
 | Support contact | **Settled: `support@visibleshelf.com`.** Same inbox as lead intake (`EMAIL_SUPPORT`). Confirm monitoring SLA. |
 | Permissions justification | **Done** — code requests Inventory **Read** + Merchant **Read** only (§7.2). Re-verify the consent screen on next reinstall. |
 | Launch path | **Done** — bound merchants route to their tenant; unbound route into the `clover_market` signup lane → tenant creation → auto-OAuth → GMC chain (§7.1). `client_id` validated. |
-| Reviewer enablement | **Missing** — test-merchant credentials, "how to test" steps, demo video. |
+| Reviewer enablement | **Drafted** — how-to-test steps in §9.4 (no credentials needed; reviewers use Clover's own test merchant). Functional video scripted in `CLOVER_FUNCTIONAL_VIDEO_SCRIPT.md` — still needs recording + unlisted upload. |
 | App name | **Settled (v8): `VisibleShelf — Clover Inventory to Google Search & Maps`** (55 chars — Clover dashboard confirmed the field allows 126). Supersedes `VisibleShelf — Local Inventory Sync`; names the source→destination surface instead of the generic pipe. |
 | Categories | **Settled:** Inventory Management (functional), Retail (vertical). |
 
@@ -808,6 +808,45 @@ velocity into the intelligence layer) is also available as a lighter v1.5.
 Webhook subscriptions for Orders/Payments are already configured on the app, so
 the event plumbing is in place when this activates.
 
+### 9.4 Reviewer instructions — submission-ready text
+
+Paste-ready for the "Instructions for Reviewers" field. No test-merchant
+credentials are needed from us — reviewers install on Clover's own test
+merchant; the steps below are what they click.
+
+1. Install VisibleShelf from the App Market on your Clover test merchant, then
+   launch it from My Apps.
+2. You land on a short signup: name your store, pick a plan (every plan starts
+   with a 14-day free trial — no card required), and create an account.
+3. Optional test drive: before connecting, **Enable Demo Mode** on the
+   integrations page fills the catalog with 25 sample products so you can
+   explore sync and mapping. Demo items never reach Google, and connecting a
+   real account clears them automatically — demo and live never coexist.
+4. Clover then shows its permission screen. Note the scopes: the app requests
+   **read-only** access to inventory and business information. It cannot touch
+   orders, payments, customers, or the register — Clover enforces that. Approve
+   to connect.
+5. On the Integrations page, confirm the card shows **Connected**, then click
+   **Sync Now**. Your Clover items appear with names, prices, SKUs, categories,
+   and live stock counts (see the Mappings tab).
+6. In Clover, change an item's stock count or price and save. The update
+   reaches VisibleShelf via webhook (or the ~15-minute poll) — click Sync Now
+   or wait, then see the new value on the Mappings tab. The register stays the
+   source of truth; merchants never update the same item twice.
+7. Optional: add a product directly in VisibleShelf (name, price, photo).
+   Items that aren't in Clover sit alongside synced items — Clover never sees
+   or overwrites them.
+8. Google surface (requires the merchant's linked Google Merchant Center):
+   Integrations → Google → Products → **Sync All** pushes the catalog to
+   Merchant Center; items passing Google's checks become eligible for local
+   inventory.
+9. To disconnect: click **Disconnect** — the connection closes and stored
+   tokens are cleared immediately. Uninstalling the app from Clover does the
+   same automatically via the uninstall webhook. Reconnecting takes about 30
+   seconds through the same Connect flow.
+
+Support during review: `support@visibleshelf.com`.
+
 ## 10. Acceptance criteria for "listing is polished"
 
 - [ ] Icon + ≥2 screenshots (re-shot post-cutover), including a no-photo item still listed
@@ -830,5 +869,5 @@ the event plumbing is in place when this activates.
 - [ ] Token refresh verified by forcing an expired access token (§7.3)
 - [ ] Cap or expiry behaviour verified by forcing the boundary; card shows the state (§7.12)
 - [ ] Disconnect verified on a sub-`discovery` tenant (§7.4)
-- [ ] Reviewer test merchant + how-to-test notes ready (§5)
+- [x] How-to-test notes drafted (§9.4 — paste into the reviewer-instructions field at submission)
 - [ ] App Market Spotlight pitch sent (§8 step 10)

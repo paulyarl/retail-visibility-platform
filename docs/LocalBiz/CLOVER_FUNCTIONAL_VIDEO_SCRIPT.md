@@ -3,8 +3,10 @@
 Purpose: App Market submission "functional usage" video + reusable script pattern for
 future POS integration videos (Square, NRS, Lightspeed).
 
-Target length: ~3:00. Audience framing: a busy merchant (not a developer), even
-though reviewers watch it. Tone: warm, plain, unhurried. No jargon.
+Target length: ~3:20 with the optional demo beat (~3:00 without — cutting it
+shifts every later timestamp back 20s). Audience framing: a busy merchant (not
+a developer), even though reviewers watch it. Tone: warm, plain, unhurried.
+No jargon.
 
 Recording conventions:
 - 1080p, browser zoom ~110% so UI text reads on review screens
@@ -44,19 +46,31 @@ Recording conventions:
 > itself is always free — the trial just opens the visibility. That's the only
 > typing you'll do."
 
-### [0:55–1:15] Clover OAuth consent  *(long hold — the permission story)*
+### [0:55–1:10] Optional: demo test-drive  *(the safety beat)*
+
+> "Not ready to connect yet? Demo mode fills your shelf with twenty-five sample
+> products — click around, test the sync, see how conflicts resolve. It's a
+> test drive, not a live connection: nothing touches your Clover account, and
+> nothing reaches Google. When you do connect for real, the samples clear out
+> automatically and your real catalog takes over."
+
+*(Show: Enable Demo Mode → 25 items populate → maybe a quick Simulate-tab
+glance. The "clears out automatically" claim is real — connecting a real
+account purges demo items and mappings.)*
+
+### [1:10–1:30] Clover OAuth consent  *(long hold — the permission story)*
 
 > "Now Clover asks your permission — and notice what it's asking. Read your
 > inventory. Read your business info. That's all. We never touch your register,
 > your orders, or your payments — Clover itself enforces that. If it can't read
 > it, we can't see it."
 
-### [1:15–1:35] Integrations page — Connected, Sync Now → items land
+### [1:30–1:50] Integrations page — Connected, Sync Now → items land
 
 > "And you're connected. Hit Sync Now, and your Clover items come straight in —
 > names, prices, SKUs, and real stock counts from your register."
 
-### [1:35–2:05] Mappings tab + the live-edit beat
+### [1:50–2:20] Mappings tab + the live-edit beat
 
 > "Here's the part that matters. Change something in Clover — a case of coconut
 > milk comes in, or a price goes from $1.99 to $2.19 — and within about fifteen
@@ -67,7 +81,7 @@ Recording conventions:
 *(Cut the wait: caption "15 min later (or Sync Now)", then show the new count
 on the Mappings/Products tab.)*
 
-### [2:05–2:25] Add a product that isn't in Clover
+### [2:20–2:40] Add a product that isn't in Clover
 
 > "And not everything you sell lives in the register — a lunch special, a
 > service, that one-off item with no barcode. Add it right here, with its own
@@ -78,7 +92,7 @@ on the Mappings/Products tab.)*
 visibly distinct from the Clover-synced items so the "two sources, one shelf"
 point lands.)*
 
-### [2:25–2:50] Google integrations → Products → Sync All → Synced
+### [2:40–3:05] Google integrations → Products → Sync All → Synced
 
 > "Then, with one click, everything syncs to your Google Merchant Center —
 > Clover items and yours together, with your prices, your stock counts, and
@@ -87,7 +101,7 @@ point lands.)*
 > there, what it costs, and what it looks like. Your catalog, presented the
 > way you built it."
 
-### [2:50–3:05] Disconnect → card flips  *(the trust beat)*
+### [3:05–3:20] Disconnect → card flips  *(the trust beat)*
 
 > "And if you ever change your mind, uninstall or disconnect — your access token
 > is cleared immediately and the sync stops. Your catalog stays yours. That's
@@ -104,6 +118,10 @@ point lands.)*
 - Platform-only products: say "Clover never sees it and never overwrites it" —
   true because POS sync only manages POS-mapped items. Don't imply Clover
   tracks it, and don't call it "synced to Clover" (it's VisibleShelf→Google).
+- Demo mode is a test drive, not a pipeline: demo items are excluded from GMC
+  push/selection (`source != 'CLOVER_DEMO'`), and connecting a real account
+  auto-purges them. Never show a demo item syncing to Google, and never
+  present demo + real as coexisting — the integration is one or the other.
 - Don't promise sync latency shorter than reality: "about every 15 minutes"
   (webhook-driven updates can arrive sooner — fine, but don't lead with it).
 - Pricing/trial must match the tier contract, never ad-lib numbers:
@@ -123,13 +141,16 @@ Keep the six-beat skeleton; swap the bracketed parts per POS:
 2. **Install + pricing honesty (15s)** — free install, where platform pricing lives
 3. **Signup lane (25s)** — the automatic continuation + trial/pricing read
    (14-day trial, name the trio prices); emphasize "only typing you'll do"
-4. **OAuth consent (20s, long hold)** — read the scopes aloud; name what we *can't* do
-5. **Live sync proof (30s)** — edit in POS (price AND stock) → lands in
+4. **Demo test-drive (15s, optional)** — "zero-risk test drive: nothing touches
+   [POS], nothing reaches Google; connecting for real clears the samples" —
+   the product-safety case during trial
+5. **OAuth consent (20s, long hold)** — read the scopes aloud; name what we *can't* do
+6. **Live sync proof (30s)** — edit in POS (price AND stock) → lands in
    VisibleShelf; "register is source of truth" for name/price/qty
-6. **Platform-only item (20s)** — add a product the POS doesn't track
+7. **Platform-only item (20s)** — add a product the POS doesn't track
    (no barcode, a service, a special) with its own photo; "POS never sees
    it and never overwrites it — it's yours"
-7. **Downstream payoff (25s) + trust close (15s)** — GMC push carries
+8. **Downstream payoff (25s) + trust close (15s)** — GMC push carries
    POS items and platform-only items together: price + qty + photos;
    SWIS/local-inventory eligibility, then disconnect = tokens cleared,
    "your catalog stays yours"
