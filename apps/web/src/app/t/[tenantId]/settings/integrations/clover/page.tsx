@@ -73,6 +73,16 @@ interface ItemMapping {
   };
 }
 
+interface PlatformOnlyItem {
+  id: string;
+  name: string;
+  sku: string;
+  price_cents: number;
+  stock: number;
+  source: string;
+  item_status: string;
+}
+
 interface CategoryMapping {
   id: string;
   clover_category_id: string;
@@ -141,6 +151,7 @@ export default function CloverIntegrationPage() {
   const [simulationResults, setSimulationResults] = useState<SimulationResult[]>([]);
   const [mappings, setMappings] = useState<ItemMapping[]>([]);
   const [categoryMappings, setCategoryMappings] = useState<CategoryMapping[]>([]);
+  const [platformOnlyItems, setPlatformOnlyItems] = useState<PlatformOnlyItem[]>([]);
   const [syncLogs, setSyncLogs] = useState<SyncLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
@@ -177,6 +188,7 @@ export default function CloverIntegrationPage() {
     try {
       const data = await integrationService.getCloverMappings(tenantId, status?.mode === 'demo');
       setMappings(data.mappings || []);
+      setPlatformOnlyItems(data.platformOnly || []);
     } catch (err) {
       clientLogger.error('Failed to fetch mappings:', { detail: err });
     }
@@ -831,7 +843,22 @@ export default function CloverIntegrationPage() {
           {activeTab === 'mappings' && (
             <div className="space-y-4">
               <div className="flex items-center justify-between">
-                <h3 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100">Item Mappings</h3>
+                <div>
+                  <h3 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100">Item Mappings</h3>
+                  <div className="flex gap-2 mt-1">
+                    <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300">
+                      {mappings.filter(m => m.mapping_status === 'mapped').length} synced from Clover
+                    </span>
+                    <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300">
+                      {platformOnlyItems.length} platform-only
+                    </span>
+                    {mappings.filter(m => m.mapping_status === 'conflict').length > 0 && (
+                      <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300">
+                        {mappings.filter(m => m.mapping_status === 'conflict').length} conflicts
+                      </span>
+                    )}
+                  </div>
+                </div>
                 <Button
                   onClick={fetchMappings}
                   variant="gradient"
@@ -846,6 +873,9 @@ export default function CloverIntegrationPage() {
                 <div className="text-center py-8 text-neutral-500">No mappings found</div>
               ) : (
                 <div className="bg-white dark:bg-neutral-800 rounded-lg border border-neutral-200 dark:border-neutral-700 overflow-hidden">
+                  <div className="px-4 py-2 bg-neutral-50 dark:bg-neutral-700/50 border-b border-neutral-200 dark:border-neutral-700 text-xs text-neutral-600 dark:text-neutral-400">
+                    POS-managed — stock and price sync from Clover on every poll
+                  </div>
                   <table className="w-full">
                     <thead className="bg-neutral-50 dark:bg-neutral-700/50">
                       <tr>
@@ -906,6 +936,56 @@ export default function CloverIntegrationPage() {
                       ))}
                     </tbody>
                   </table>
+                </div>
+              )}
+
+              {/* Platform-only Items Section */}
+              {platformOnlyItems.length > 0 && (
+                <div className="mt-8">
+                  <div className="mb-4">
+                    <h3 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100">Platform-Only Items</h3>
+                    <p className="text-sm text-neutral-600 dark:text-neutral-400 mt-1">
+                      Items that live on VisibleShelf but not in Clover — managed here only, still visible in local search and Google listings.
+                    </p>
+                  </div>
+                  <div className="bg-white dark:bg-neutral-800 rounded-lg border border-blue-200 dark:border-blue-800 overflow-hidden">
+                    <table className="w-full">
+                      <thead className="bg-blue-50 dark:bg-blue-900/20">
+                        <tr>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-neutral-500 uppercase">Item</th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-neutral-500 uppercase">Price</th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-neutral-500 uppercase">Stock</th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-neutral-500 uppercase">Source</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-neutral-200 dark:divide-neutral-700">
+                        {platformOnlyItems.map((item) => (
+                          <tr key={item.id}>
+                            <td className="px-4 py-3">
+                              <div className="text-sm font-medium text-neutral-900 dark:text-neutral-100">{item.name}</div>
+                              <div className="text-xs text-neutral-500">{item.sku}</div>
+                            </td>
+                            <td className="px-4 py-3 text-sm text-neutral-900 dark:text-neutral-100">
+                              ${((item.price_cents || 0) / 100).toFixed(2)}
+                            </td>
+                            <td className="px-4 py-3 text-sm text-neutral-900 dark:text-neutral-100">
+                              {item.stock}
+                            </td>
+                            <td className="px-4 py-3">
+                              <span className="px-2 py-1 rounded text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300">
+                                {item.source === 'MANUAL' ? 'Manual' :
+                                  item.source === 'API_IMPORT' ? 'Import' :
+                                    item.source === 'BULK_UPLOAD' ? 'Bulk Upload' :
+                                      item.source === 'BARCODE_SCAN' ? 'Scan' :
+                                        item.source === 'QUICK_START_WIZARD' ? 'Wizard' :
+                                          item.source === 'CLOVER_DEMO' ? 'Demo' : item.source}
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               )}
 
