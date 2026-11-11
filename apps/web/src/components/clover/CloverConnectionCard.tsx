@@ -13,6 +13,9 @@ interface CloverConnectionCardProps {
   status: CloverStatus;
   isEnabled: boolean;
   mode?: 'demo' | 'production' | null;
+  // True when a production row carries the demo overlay (sample items on top
+  // of live sync). The toggle is non-destructive — samples only.
+  demoActive?: boolean;
   lastSyncAt?: string;
   lastSyncStatus?: string | null;
   stats?: {
@@ -35,6 +38,7 @@ export function CloverConnectionCard({
   status,
   isEnabled,
   mode,
+  demoActive,
   lastSyncAt,
   lastSyncStatus,
   stats,
@@ -162,27 +166,41 @@ export function CloverConnectionCard({
           </div>
         )}
 
-        {/* Disconnected production — reconnect is the only valid action */}
+        {/* Disconnected production — reconnect, or test-drive via overlay */}
         {!isEnabled && mode === 'production' && (
           <div>
             <h3 className="text-sm font-medium text-neutral-900 dark:text-neutral-100 mb-2">
               Reconnect Your Clover Account
             </h3>
             <p className="text-sm text-neutral-600 dark:text-neutral-400 mb-4">
-              This workspace was connected to a Clover merchant account. Reconnect to resume syncing your real inventory.
+              This workspace was connected to a Clover merchant account. Reconnect to resume syncing your real inventory — or flip on demo mode for a non-destructive test drive in the meantime.
             </p>
-            {onConnect && showActions && (
-              <Button
-                variant="gradient"
-                style={{ color: 'white' }}
-                onClick={onConnect}
-                disabled={isLoading}
-                className="bg-green-600 hover:bg-green-700"
-              >
-                <ExternalLink className="h-4 w-4 mr-2" />
-                Reconnect with Clover
-              </Button>
-            )}
+            <div className="flex gap-2">
+              {onConnect && showActions && (
+                <Button
+                  variant="gradient"
+                  style={{ color: 'white' }}
+                  onClick={onConnect}
+                  disabled={isLoading}
+                  className="bg-green-600 hover:bg-green-700"
+                >
+                  <ExternalLink className="h-4 w-4 mr-2" />
+                  Reconnect with Clover
+                </Button>
+              )}
+              {onEnableDemo && showActions && (
+                <Button
+                  variant="gradient"
+                  style={{ color: 'white' }}
+                  size="sm"
+                  onClick={() => handleDemoToggle(true)}
+                  disabled={isLoading}
+                  className="bg-amber-600 hover:bg-amber-700"
+                >
+                  Enable Demo Mode
+                </Button>
+              )}
+            </div>
           </div>
         )}
 
@@ -278,8 +296,17 @@ export function CloverConnectionCard({
               </div>
             )}
 
+            {demoActive && (
+              <div className="flex items-start gap-3 p-4 bg-amber-50 dark:bg-amber-900/20 rounded-lg border border-amber-200 dark:border-amber-800">
+                <CheckCircle2 className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" />
+                <p className="text-sm text-amber-800 dark:text-amber-200">
+                  Demo overlay active — sample products are layered on top of live inventory. Live sync keeps running; samples never reach Clover or Google.
+                </p>
+              </div>
+            )}
+
             {showActions && (
-              <div className="flex gap-2">
+              <div className="flex gap-2 flex-wrap">
                 {onSync && (
                   <Button
                     variant="gradient"
@@ -290,6 +317,18 @@ export function CloverConnectionCard({
                   >
                     <RefreshCw className="h-4 w-4 mr-2" />
                     Sync Now
+                  </Button>
+                )}
+                {(onEnableDemo || onDisableDemo) && (
+                  <Button
+                    variant="gradient"
+                    style={{ color: 'white' }}
+                    size="sm"
+                    onClick={() => handleDemoToggle(!demoActive)}
+                    disabled={isLoading}
+                    className="bg-amber-600 hover:bg-amber-700"
+                  >
+                    {demoActive ? 'Disable Demo' : 'Enable Demo'}
                   </Button>
                 )}
                 <Button

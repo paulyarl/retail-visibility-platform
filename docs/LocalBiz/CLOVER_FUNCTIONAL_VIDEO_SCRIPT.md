@@ -60,7 +60,8 @@ optionally a conflict. The demo's real depth: 11 scenarios covering the full
 POS change vocabulary — item adds/updates/deletes/conflicts/failures/bulk,
 plus category adds/renames/moves/conflicts — paths a live connection takes
 weeks to hit naturally. The "clears out automatically" claim is real —
-connecting a real account purges demo items and mappings.)*
+toggling demo off removes the samples, and connecting a real account purges
+them before the integration goes live.)*
 
 ### [1:10–1:30] Clover OAuth consent  *(long hold — the permission story)*
 
@@ -123,9 +124,13 @@ point lands.)*
   true because POS sync only manages POS-mapped items. Don't imply Clover
   tracks it, and don't call it "synced to Clover" (it's VisibleShelf→Google).
 - Demo mode is a test drive, not a pipeline: demo items are excluded from GMC
-  push/selection (`source != 'CLOVER_DEMO'`), and connecting a real account
-  auto-purges them. Never show a demo item syncing to Google, and never
-  present demo + real as coexisting — the integration is one or the other.
+  push/selection (`source != 'CLOVER_DEMO'`) and carry `visibility='private'`
+  so they never appear on the public storefront or sitemap either. The demo
+  is an on-demand overlay — it can toggle on over a live production
+  connection and off again without touching real data (connecting for real
+  also purges it). So demo + real items MAY legitimately appear in the
+  inventory list together — what must never be shown is a demo item reaching
+  Google or the public storefront.
 - Don't promise sync latency shorter than reality: "about every 15 minutes"
   (webhook-driven updates can arrive sooner — fine, but don't lead with it).
 - Pricing/trial must match the tier contract, never ad-lib numbers:
@@ -146,8 +151,9 @@ Keep the six-beat skeleton; swap the bracketed parts per POS:
 3. **Signup lane (25s)** — the automatic continuation + trial/pricing read
    (14-day trial, name the trio prices); emphasize "only typing you'll do"
 4. **Demo test-drive (15s, optional)** — "zero-risk test drive: nothing touches
-   [POS], nothing reaches Google; connecting for real clears the samples" —
-   the product-safety case during trial
+   [POS], nothing reaches Google or your storefront; toggle it off or connect
+   for real and the samples clear" — the product-safety case during trial
+   (the overlay is reversible — a connected merchant can flip it on anytime)
 5. **OAuth consent (20s, long hold)** — read the scopes aloud; name what we *can't* do
 6. **Live sync proof (30s)** — edit in POS (price AND stock) → lands in
    VisibleShelf; "register is source of truth" for name/price/qty

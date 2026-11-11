@@ -139,6 +139,7 @@ export default function IntegrationsPage() {
             status={cloverStatus}
             isEnabled={cloverConnected}
             mode={cloverData?.mode}
+            demoActive={cloverData?.demoActive}
             lastSyncAt={cloverData?.lastSyncAt}
             lastSyncStatus={cloverData?.lastSyncStatus}
             stats={cloverData?.stats}

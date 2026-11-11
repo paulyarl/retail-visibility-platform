@@ -12,6 +12,9 @@ interface CloverIntegrationData {
   enabled: boolean;
   mode: 'demo' | 'production' | null;
   status: string | null;
+  // True for a demo row OR a production row carrying the demo overlay.
+  demoActive?: boolean;
+  demoItems?: number;
   stats?: {
     totalItems: number;
     mappedItems: number;

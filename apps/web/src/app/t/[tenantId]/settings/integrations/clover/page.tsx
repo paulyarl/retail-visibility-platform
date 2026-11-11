@@ -15,6 +15,10 @@ interface CloverStatus {
   mode: 'demo' | 'production' | null;
   status: string | null;
   merchantId?: string;
+  // Demo overlay state — true for a demo row OR a production row carrying
+  // demo mappings (the toggle is non-destructive; live sync keeps running).
+  demoActive?: boolean;
+  demoItems?: number;
   stats?: {
     totalItems: number;
     mappedItems: number;
@@ -225,8 +229,8 @@ export default function CloverIntegrationPage() {
   // Load tab-specific data
   useEffect(() => {
     if (status?.enabled) {
-      // Simulate tab only available in demo mode
-      if (activeTab === 'simulate' && status.mode === 'demo') fetchScenarios();
+      // Simulate tab available whenever demo data exists (demo row or overlay)
+      if (activeTab === 'simulate' && status.demoActive) fetchScenarios();
       // Mappings and history work for both demo and production
       if (activeTab === 'mappings') {
         fetchMappings();
@@ -423,13 +427,18 @@ export default function CloverIntegrationPage() {
             <div>
               <h1 className="text-2xl font-bold text-neutral-900 dark:text-neutral-100">Clover POS Integration</h1>
               <p className="text-neutral-600 dark:text-neutral-400">
-                {!status?.enabled ? 'Not Connected' : status.mode === 'demo' ? 'Demo Mode Active' : 'Connected'}
+                {!status?.enabled ? 'Not Connected' : status.mode === 'demo' ? 'Demo Mode Active' : status.demoActive ? 'Connected · Demo Overlay' : 'Connected'}
               </p>
             </div>
           </div>
           {status?.mode === 'demo' && (
             <span className="px-3 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200 rounded-full text-sm font-medium">
               Demo Mode
+            </span>
+          )}
+          {status?.mode === 'production' && status.demoActive && (
+            <span className="px-3 py-1 bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-200 rounded-full text-sm font-medium">
+              Demo Overlay
             </span>
           )}
         </div>
@@ -458,15 +467,26 @@ export default function CloverIntegrationPage() {
                 <p className="text-neutral-600 dark:text-neutral-400 mb-6">
                   This workspace was connected to a Clover merchant account. Reconnect to resume syncing your real inventory.
                 </p>
-                <Button
-                  onClick={handleConnectReal}
-                  disabled={actionLoading}
-                  variant="gradient"
-                  style={{ color: 'white' }}
-                  className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 font-medium"
-                >
-                  {actionLoading ? 'Connecting...' : 'Reconnect'}
-                </Button>
+                <div className="flex gap-3 justify-center">
+                  <Button
+                    onClick={handleConnectReal}
+                    disabled={actionLoading}
+                    variant="gradient"
+                    style={{ color: 'white' }}
+                    className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 font-medium"
+                  >
+                    {actionLoading ? 'Connecting...' : 'Reconnect'}
+                  </Button>
+                  <Button
+                    onClick={status.demoActive ? handleDisableDemo : handleEnableDemo}
+                    disabled={actionLoading}
+                    variant="gradient"
+                    style={{ color: 'white' }}
+                    className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 font-medium"
+                  >
+                    {actionLoading ? 'Working...' : status.demoActive ? 'Disable Demo' : 'Enable Demo Mode'}
+                  </Button>
+                </div>
               </>
             ) : (
               <>
@@ -503,13 +523,13 @@ export default function CloverIntegrationPage() {
         </div>
       )}
 
-      {/* Connected State (Demo or Production) */}
-      {status?.enabled && (
+      {/* Connected State (Demo, Production, or a disconnected row with a live demo overlay) */}
+      {(status?.enabled || status?.demoActive) && (
         <>
-          {/* Tabs - Simulate tab only in demo mode */}
+          {/* Tabs - Simulate tab whenever demo data is present (demo row or overlay) */}
           <div className="border-b border-neutral-200 dark:border-neutral-700 mb-6">
             <nav className="flex gap-6">
-              {(status.mode === 'demo'
+              {(status.demoActive
                 ? ['overview', 'simulate', 'mappings', 'history', 'explorer'] as const
                 : ['overview', 'mappings', 'history', 'explorer'] as const
               ).map((tab) => (
@@ -535,7 +555,7 @@ export default function CloverIntegrationPage() {
                 <div className="bg-white dark:bg-neutral-800 rounded-lg p-4 border border-neutral-200 dark:border-neutral-700">
                   <div className="text-sm text-neutral-600 dark:text-neutral-400">Status</div>
                   <div className="text-lg font-bold text-green-600">
-                    {status.mode === 'demo' ? 'Demo Active' : 'Connected'}
+                    {status.mode === 'demo' ? 'Demo Active' : status.demoActive ? 'Demo Overlay' : 'Connected'}
                   </div>
                 </div>
                 <div className="bg-white dark:bg-neutral-800 rounded-lg p-4 border border-neutral-200 dark:border-neutral-700">
@@ -578,20 +598,43 @@ export default function CloverIntegrationPage() {
                 </div>
               )}
 
+              {/* Demo overlay notice — sample items layer on top of live sync */}
+              {status.mode === 'production' && status.demoActive && (
+                <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-4">
+                  <h3 className="font-semibold text-amber-900 dark:text-amber-100 mb-2">Demo Overlay Active</h3>
+                  <p className="text-sm text-amber-800 dark:text-amber-200">
+                    {status.demoItems || 25} sample products are layered on top of your live inventory for
+                    test-driving. Live sync keeps running — sample items never touch Clover, your storefront,
+                    or Google. Disabling removes only the samples.
+                  </p>
+                </div>
+              )}
+
               {/* Actions */}
               <div className="flex flex-wrap gap-3">
-                {/* Production: Sync Now button */}
+                {/* Production: Sync Now + demo overlay toggle */}
                 {status.mode === 'production' && (
-                  <Button
-                    onClick={handleSync}
-                    variant="gradient"
-                    style={{ color: 'white' }}
-                    disabled={actionLoading}
-                    className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 font-medium flex items-center gap-2"
-                  >
-                    <RefreshCw className={`w-4 h-4 ${actionLoading ? 'animate-spin' : ''}`} />
-                    Sync Now
-                  </Button>
+                  <>
+                    <Button
+                      onClick={handleSync}
+                      variant="gradient"
+                      style={{ color: 'white' }}
+                      disabled={actionLoading}
+                      className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 font-medium flex items-center gap-2"
+                    >
+                      <RefreshCw className={`w-4 h-4 ${actionLoading ? 'animate-spin' : ''}`} />
+                      Sync Now
+                    </Button>
+                    <Button
+                      onClick={status.demoActive ? handleDisableDemo : handleEnableDemo}
+                      disabled={actionLoading}
+                      variant="gradient"
+                      style={{ color: 'white' }}
+                      className="px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 disabled:opacity-50 font-medium"
+                    >
+                      {status.demoActive ? 'Disable Demo Overlay' : 'Enable Demo Overlay'}
+                    </Button>
+                  </>
                 )}
 
                 <Button

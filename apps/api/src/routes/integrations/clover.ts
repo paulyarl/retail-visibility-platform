@@ -88,25 +88,32 @@ router.post('/:tenantId/clover/demo/enable', authenticateToken, checkTenantAcces
         });
       }
 
-      // If in production mode, cannot switch back to demo
-      return res.status(400).json({
-        error: 'already_in_production',
-        message: 'Cannot enable demo mode after migrating to production'
+      // Production row → demo overlay. mode stays 'production': live sync keeps
+      // running on real items while the 25 sample items layer on top as a
+      // non-destructive test drive (same posture as Clover's own
+      // sandbox-alongside-production model).
+      integration = await prisma.clover_integrations_list.update({
+        where: { id: integration.id },
+        data: {
+          demo_enabled_at: integration.demo_enabled_at ?? new Date(),
+          demo_last_active_at: new Date(),
+          updated_at: new Date()
+        }
+      });
+    } else {
+      // No integration at all → pure demo-mode row (pre-commitment test drive)
+      integration = await prisma.clover_integrations_list.create({
+        data: {
+          id: generateCloverIntegrationId(),
+          tenant_id: tenantId,
+          mode: 'demo',
+          status: 'active',
+          demo_enabled_at: new Date(),
+          demo_last_active_at: new Date(),
+          updated_at: new Date()
+        } as any
       });
     }
-
-    // Create new integration in demo mode
-    integration = await prisma.clover_integrations_list.create({
-      data: { 
-        id: generateCloverIntegrationId(),
-        tenant_id: tenantId,
-        mode: 'demo',
-        status: 'active',
-        demo_enabled_at: new Date(),
-        demo_last_active_at: new Date(),
-        updated_at: new Date()
-      } as any
-    });
 
     // Import demo items into inventory
     const demoItems = getDemoItems();
@@ -163,7 +170,13 @@ router.post('/:tenantId/clover/demo/enable', authenticateToken, checkTenantAcces
         const directoryCategoryId = categoryMap.get(demoItem.category) || null;
         
         if (existingItem) {
-          // Update existing demo item with proper category assignment
+          // Only reuse an existing row when it's demo-owned. Under the overlay a
+          // real merchant item may share a demo SKU — updating it would stamp
+          // demo metadata onto live data, so that demo item is skipped instead.
+          if (existingItem.source !== 'CLOVER_DEMO') {
+            console.log(`[Clover Demo] Skipping ${demoItem.sku} — SKU owned by a non-demo item`);
+            continue;
+          }
           console.log(`[Clover Demo] Updating existing item: ${existingItem.sku} with category: ${demoItem.category} (${directoryCategoryId})`);
 
           const updatedItem = await prisma.inventory_items.update({
@@ -172,9 +185,33 @@ router.post('/:tenantId/clover/demo/enable', authenticateToken, checkTenantAcces
               category_path: rvpItem.category_path,
               directory_category_id: directoryCategoryId,
               metadata: rvpItem.metadata,
+              visibility: 'private',
               updated_at: new Date()
             }
           });
+
+          // Re-enable after a keep-items disable leaves the item but not the
+          // mapping — recreate it so disable/simulate can find it again.
+          const existingMapping = await prisma.clover_item_mappings_list.findFirst({
+            where: { integration_id: integration.id, clover_item_id: demoItem.id }
+          });
+          if (!existingMapping) {
+            await prisma.clover_item_mappings_list.create({
+              data: {
+                id: generateCloverItemMappingsId(),
+                integration_id: integration.id,
+                clover_item_id: demoItem.id,
+                clover_item_name: demoItem.name,
+                clover_sku: demoItem.sku,
+                rvp_item_id: updatedItem.id,
+                rvp_sku: rvpItem.sku,
+                mapping_status: 'mapped',
+                last_synced_at: new Date(),
+                last_sync_status: 'success',
+                updated_at: new Date()
+              } as any
+            });
+          }
 
           importedItems.push(updatedItem);
           continue;
@@ -285,19 +322,32 @@ router.post('/:tenantId/clover/demo/disable', authenticateToken, checkTenantAcce
       return res.status(404).json({ error: 'integration_not_found' });
     }
 
-    if (integration.mode !== 'demo') {
-      return res.status(400).json({
-        error: 'not_in_demo_mode',
-        message: 'Can only disable demo mode when integration is in demo mode'
-      });
+    const isDemoRow = integration.mode === 'demo';
+
+    // Demo mappings always carry the emulator's id prefix — that prefix is the
+    // boundary between sample data and real Clover mappings on a shared
+    // (production-overlay) integration row.
+    const demoMappingWhere = isDemoRow
+      ? { integration_id: integration.id }
+      : { integration_id: integration.id, clover_item_id: { startsWith: 'demo_' } };
+
+    if (!isDemoRow) {
+      const overlayCount = await prisma.clover_item_mappings_list.count({ where: demoMappingWhere });
+      if (overlayCount === 0) {
+        return res.status(400).json({
+          error: 'not_in_demo_mode',
+          message: 'No demo overlay is active on this integration'
+        });
+      }
     }
 
     let deletedItemsCount = 0;
     let keptItemsCount = 0;
 
-    // Get all item mappings for this integration
+    // Demo-mode row: all mappings are demo. Production overlay: only demo_*
+    // mappings — real Clover mappings and items are untouched.
     const itemMappings = await prisma.clover_item_mappings_list.findMany({
-      where: { integration_id: integration.id },
+      where: demoMappingWhere,
       select: { rvp_item_id: true }
     });
 
@@ -323,10 +373,25 @@ router.post('/:tenantId/clover/demo/disable', authenticateToken, checkTenantAcce
       console.log(`[Clover Demo Disable] Kept ${keptItemsCount} demo items for tenant ${tenantId}`);
     }
 
-    // Delete integration (cascades to mappings, logs, snapshots)
-    await prisma.clover_integrations_list.delete({
-      where: { id: integration.id }
-    });
+    if (isDemoRow) {
+      // Pure demo tenant: the integration row itself is demo scaffolding —
+      // delete it (cascades to mappings, logs, snapshots).
+      await prisma.clover_integrations_list.delete({
+        where: { id: integration.id }
+      });
+    } else {
+      // Overlay: remove only the demo mappings; the production connection,
+      // its real mappings, and live sync all continue untouched.
+      await prisma.clover_item_mappings_list.deleteMany({ where: demoMappingWhere });
+      await prisma.clover_integrations_list.update({
+        where: { id: integration.id },
+        data: {
+          demo_enabled_at: null,
+          demo_last_active_at: null,
+          updated_at: new Date()
+        }
+      });
+    }
 
     return res.json({
       message: 'Demo mode disabled successfully',
@@ -382,21 +447,37 @@ router.get('/:tenantId/clover/status', authenticateToken, checkTenantAccess, asy
       });
     }
 
-    // Calculate stats
+    // Demo overlay state is derived from actual demo mappings, not a flag —
+    // items exist ⇔ overlay on, regardless of timestamp hygiene.
+    const demoMappingCount = await prisma.clover_item_mappings_list.count({
+      where: {
+        integration_id: integration.id,
+        clover_item_id: { startsWith: 'demo_' }
+      }
+    });
+    const isDemoRow = integration.mode === 'demo';
+    const demoActive = isDemoRow || demoMappingCount > 0;
+
+    // Stats: on a production row the 25 overlay mappings would inflate the
+    // real-sync numbers — exclude them there. A pure demo row counts them all.
+    const statScope = isDemoRow
+      ? { integration_id: integration.id }
+      : { integration_id: integration.id, clover_item_id: { not: { startsWith: 'demo_' } } };
+
     const totalMappings = await prisma.clover_item_mappings_list.count({
-      where: { integration_id: integration.id }
+      where: statScope
     });
 
     const mappedCount = await prisma.clover_item_mappings_list.count({
       where: {
-        integration_id: integration.id,
+        ...statScope,
         mapping_status: 'mapped'
       }
     });
 
     const conflictCount = await prisma.clover_item_mappings_list.count({
       where: {
-        integration_id: integration.id,
+        ...statScope,
         mapping_status: 'conflict'
       }
     });
@@ -406,6 +487,8 @@ router.get('/:tenantId/clover/status', authenticateToken, checkTenantAccess, asy
       mode: integration.mode,
       status: integration.status,
       merchantId: integration.merchant_id,
+      demoActive,
+      demoItems: demoMappingCount,
       demoEnabledAt: integration.demo_enabled_at,
       demoLastActiveAt: integration.demo_last_active_at,
       productionEnabledAt: integration.production_enabled_at,
@@ -604,9 +687,10 @@ router.get('/clover/oauth/callback', async (req: Request, res: Response) => {
     });
 
     if (integration) {
+      const wasDemoRow = integration.mode === 'demo';
       // Demo → production is a hard transition: purge the 25 test-drive items
       // and their mappings so a production integration never carries demo data.
-      if (integration.mode === 'demo') {
+      if (wasDemoRow) {
         const demoMappings = await prisma.clover_item_mappings_list.findMany({
           where: { integration_id: integration.id },
           select: { id: true, rvp_item_id: true }
@@ -639,7 +723,11 @@ router.get('/clover/oauth/callback', async (req: Request, res: Response) => {
           refresh_token: encryptedRefreshToken,
           token_expires_at: tokenExpiresAt,
           merchant_id: merchantId,
-          production_enabled_at: new Date()
+          production_enabled_at: new Date(),
+          // A converted demo row's overlay lifecycle ended with the purge —
+          // clear its markers. A production reconnect with a live overlay
+          // keeps them (items + mappings survive; this column is informative).
+          ...(wasDemoRow ? { demo_enabled_at: null, demo_last_active_at: null } : {})
         }
       });
     } else {
@@ -732,7 +820,12 @@ router.get('/:tenantId/clover/demo/scenarios', authenticateToken, checkTenantAcc
       where: { tenant_id: tenantId }
     });
 
-    if (!integration || integration.mode !== 'demo') {
+    const demoAvailable = integration && (integration.mode === 'demo' ||
+      (await prisma.clover_item_mappings_list.count({
+        where: { integration_id: integration.id, clover_item_id: { startsWith: 'demo_' } }
+      })) > 0);
+
+    if (!demoAvailable) {
       return res.status(400).json({
         error: 'demo_mode_required',
         message: 'Simulation scenarios are only available in demo mode'
@@ -773,7 +866,12 @@ router.post('/:tenantId/clover/demo/simulate', authenticateToken, checkTenantAcc
       where: { tenant_id: tenantId }
     });
 
-    if (!integration || integration.mode !== 'demo') {
+    const demoAvailable = integration && (integration.mode === 'demo' ||
+      (await prisma.clover_item_mappings_list.count({
+        where: { integration_id: integration.id, clover_item_id: { startsWith: 'demo_' } }
+      })) > 0);
+
+    if (!demoAvailable) {
       return res.status(400).json({
         error: 'demo_mode_required',
         message: 'Simulations are only available in demo mode'
@@ -2123,7 +2221,9 @@ router.post('/:tenantId/clover/sync', authenticateToken, checkTenantAccess, requ
           // points at the colliding item so the resolve endpoint can apply
           // use_clover / custom onto it.
           const skuOwner = await prisma.inventory_items.findFirst({
-            where: { tenant_id: tenantId, sku: cloverItem.sku },
+            // Demo items never own a real SKU — a collision with an overlay
+            // sample is transient and resolves when the toggle flips off.
+            where: { tenant_id: tenantId, sku: cloverItem.sku, source: { not: 'CLOVER_DEMO' } },
             select: { id: true }
           });
           if (skuOwner) {
@@ -2253,8 +2353,10 @@ router.post('/:tenantId/clover/sync', authenticateToken, checkTenantAccess, requ
           rvp_item_id: { not: null },
           // Only Clover-managed items archive — a 'conflict' mapping points
           // at a merchant-owned item that must outlive a Clover-side delete.
+          // demo_* mappings are the overlay; they are never in the real
+          // catalog, so excluding them keeps the toggle non-destructive.
           mapping_status: 'mapped',
-          clover_item_id: { notIn: [...cloverItemIds] }
+          clover_item_id: { notIn: [...cloverItemIds], not: { startsWith: 'demo_' } }
         },
         select: { id: true, rvp_item_id: true }
       });
