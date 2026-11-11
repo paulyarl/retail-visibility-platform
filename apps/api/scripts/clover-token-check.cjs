@@ -116,12 +116,13 @@ async function probe(host, merchantId, token) {
 
   try {
     const logs = await client.query(
-      `SELECT operation, status, error_message, created_at
-         FROM clover_sync_logs_list ORDER BY created_at DESC LIMIT 5`,
+      `SELECT operation, status, error_message, items_processed, items_succeeded, items_failed, started_at
+         FROM clover_sync_logs_list ORDER BY started_at DESC LIMIT 5`,
     );
     console.log('recent sync logs:');
     for (const l of logs.rows) {
-      console.log(`   ${l.created_at.toISOString?.() || l.created_at}  ${l.operation}  ${l.status}  ${l.error_message || ''}`);
+      const ts = l.started_at?.toISOString?.() || l.started_at;
+      console.log(`   ${ts}  ${l.operation}  ${l.status}  ${l.items_succeeded}/${l.items_processed} ok, ${l.items_failed} failed  ${l.error_message || ''}`);
     }
   } catch (e) {
     console.log(`(clover_sync_logs_list read skipped: ${e.message})`);
