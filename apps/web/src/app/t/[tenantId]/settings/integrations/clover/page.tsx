@@ -425,7 +425,7 @@ export default function CloverIntegrationPage() {
             <div>
               <h1 className="text-2xl font-bold text-neutral-900 dark:text-neutral-100">Clover POS Integration</h1>
               <p className="text-neutral-600 dark:text-neutral-400">
-                {status?.mode === 'demo' ? 'Demo Mode Active' : status?.mode === 'production' ? 'Connected' : 'Not Connected'}
+                {!status?.enabled ? 'Not Connected' : status.mode === 'demo' ? 'Demo Mode Active' : 'Connected'}
               </p>
             </div>
           </div>
@@ -470,13 +470,13 @@ export default function CloverIntegrationPage() {
                 {actionLoading ? 'Enabling...' : 'Enable Demo Mode'}
               </Button>
               <Button
-                disabled
+                onClick={handleConnectReal}
+                disabled={actionLoading}
                 variant="gradient"
                 style={{ color: 'white' }}
-                className="px-6 py-3 bg-neutral-100 dark:bg-neutral-700 text-neutral-400 rounded-lg cursor-not-allowed font-medium"
-                title="Coming soon"
+                className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 font-medium"
               >
-                Connect Real Account
+                {actionLoading ? 'Connecting...' : 'Connect Real Account'}
               </Button>
             </div>
           </div>
