@@ -65,7 +65,7 @@ router.post(
       });
       return res.json({ success: true, verified: true });
     }
-    if (!Buffer.isBuffer(rawBody) || !verifyCloverSignature(rawBody, signature, secret)) {
+    if (!verifyCloverSignature(rawBody, signature, secret)) {
       logger.warn('[Clover Webhook] signature verification failed', undefined, {
         sigValue: signature,
         sigLen: signature?.length,
