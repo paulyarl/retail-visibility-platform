@@ -450,33 +450,55 @@ export default function CloverIntegrationPage() {
             <div className="w-16 h-16 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center mx-auto mb-4">
               <Zap className="w-8 h-8 text-green-600 dark:text-green-400" />
             </div>
-            <h2 className="text-xl font-bold text-neutral-900 dark:text-neutral-100 mb-2">
-              Try Clover Integration
-            </h2>
-            <p className="text-neutral-600 dark:text-neutral-400 mb-6">
-              Experience how Clover POS sync works with 25 sample products.
-              Test sync scenarios, conflict resolution, and mapping management before connecting your real account.
-            </p>
-            <div className="flex gap-3 justify-center">
-              <Button
-                onClick={handleEnableDemo}
-                variant="gradient"
-                style={{ color: 'white' }}
-                disabled={actionLoading}
-                className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 font-medium"
-              >
-                {actionLoading ? 'Enabling...' : 'Enable Demo Mode'}
-              </Button>
-              <Button
-                onClick={handleConnectReal}
-                disabled={actionLoading}
-                variant="gradient"
-                style={{ color: 'white' }}
-                className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 font-medium"
-              >
-                {actionLoading ? 'Connecting...' : 'Connect Real Account'}
-              </Button>
-            </div>
+            {status?.mode === 'production' ? (
+              <>
+                <h2 className="text-xl font-bold text-neutral-900 dark:text-neutral-100 mb-2">
+                  Reconnect to Clover
+                </h2>
+                <p className="text-neutral-600 dark:text-neutral-400 mb-6">
+                  This workspace was connected to a Clover merchant account. Reconnect to resume syncing your real inventory.
+                </p>
+                <Button
+                  onClick={handleConnectReal}
+                  disabled={actionLoading}
+                  variant="gradient"
+                  style={{ color: 'white' }}
+                  className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 font-medium"
+                >
+                  {actionLoading ? 'Connecting...' : 'Reconnect'}
+                </Button>
+              </>
+            ) : (
+              <>
+                <h2 className="text-xl font-bold text-neutral-900 dark:text-neutral-100 mb-2">
+                  Try Clover Integration
+                </h2>
+                <p className="text-neutral-600 dark:text-neutral-400 mb-6">
+                  Experience how Clover POS sync works with 25 sample products.
+                  Test sync scenarios, conflict resolution, and mapping management before connecting your real account.
+                </p>
+                <div className="flex gap-3 justify-center">
+                  <Button
+                    onClick={handleEnableDemo}
+                    variant="gradient"
+                    style={{ color: 'white' }}
+                    disabled={actionLoading}
+                    className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 font-medium"
+                  >
+                    {actionLoading ? 'Enabling...' : 'Enable Demo Mode'}
+                  </Button>
+                  <Button
+                    onClick={handleConnectReal}
+                    disabled={actionLoading}
+                    variant="gradient"
+                    style={{ color: 'white' }}
+                    className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 font-medium"
+                  >
+                    {actionLoading ? 'Connecting...' : 'Connect Real Account'}
+                  </Button>
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}
