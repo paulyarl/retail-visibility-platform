@@ -110,8 +110,9 @@ export function CloverConnectionCard({
 
       {/* Content */}
       <div className="p-6 space-y-6">
-        {/* Demo Mode Section */}
-        {!isEnabled && (
+        {/* Demo Mode Section — hidden once the tenant migrated to production;
+            demo enable is permanently rejected there and the button would 400. */}
+        {!isEnabled && mode !== 'production' && (
           <div className="space-y-4">
             <div>
               <h3 className="text-sm font-medium text-neutral-900 dark:text-neutral-100 mb-2">
@@ -158,6 +159,30 @@ export function CloverConnectionCard({
                 </Button>
               )}
             </div>
+          </div>
+        )}
+
+        {/* Disconnected production — reconnect is the only valid action */}
+        {!isEnabled && mode === 'production' && (
+          <div>
+            <h3 className="text-sm font-medium text-neutral-900 dark:text-neutral-100 mb-2">
+              Reconnect Your Clover Account
+            </h3>
+            <p className="text-sm text-neutral-600 dark:text-neutral-400 mb-4">
+              This workspace was connected to a Clover merchant account. Reconnect to resume syncing your real inventory.
+            </p>
+            {onConnect && showActions && (
+              <Button
+                variant="gradient"
+                style={{ color: 'white' }}
+                onClick={onConnect}
+                disabled={isLoading}
+                className="bg-green-600 hover:bg-green-700"
+              >
+                <ExternalLink className="h-4 w-4 mr-2" />
+                Reconnect with Clover
+              </Button>
+            )}
           </div>
         )}
 

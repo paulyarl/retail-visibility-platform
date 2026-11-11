@@ -808,6 +808,40 @@ velocity into the intelligence layer) is also available as a lighter v1.5.
 Webhook subscriptions for Orders/Payments are already configured on the app, so
 the event plumbing is in place when this activates.
 
+### 9.5 Demo mode is a reusable pattern, not a Clover feature
+
+Demo mode turned out to be a product asset worth carrying to future POS
+connectors (Square, NRS, Lightspeed). The contract it implements:
+
+- **Test drive, not pipeline.** Strict boolean — the integration is demo or
+  live, never mixed. Demo items (`source = 'CLOVER_DEMO'`,
+  `metadata.isDemoData`) are excluded from GMC push, Products-tab selection,
+  and validation; connecting a real account purges demo items + mappings in
+  the OAuth callback; production-mode tenants can't re-enter demo (API guard
+  + UI hides the affordance).
+- **Diff simulator, not static data.** 11 scenarios cover the full POS change
+  vocabulary: item add/update/delete/conflict/failure/bulk + category
+  add/rename/move/conflict (`clover-demo-emulator.ts`). These are the paths
+  that take weeks to hit on a live connection — the demo is how a merchant
+  rehearses the register's worst day. **Production now speaks the same
+  vocabulary**: the 15-min poll + webhook-dirty lane run a full catalog
+  reconcile (`clover-stock-sync.syncIntegration` → `reconcileItems`) —
+  stock/price/name/category diffs on mapped items, new-item import, SKU
+  collisions → `mapping_status: 'conflict'` (feeds the resolve endpoint),
+  missing items → archived, categories → created + renamed. `category_conflict`
+  stays intentionally unhandled (slug-merge).
+- **Reusable parts:** scenario vocabulary, mode-gate contract, purge-on-connect,
+  `metadata.isDemoData` marker, the Try-Demo→Connect-Real UX.
+- **Per-provider parts:** integration/mapping tables, item catalog + category
+  mapping, `source` tag. Convention for the next provider: add a `*_DEMO`
+  value to the `product_source` enum (`SQUARE_DEMO`, …) — the schema
+  migration is the forcing function — then append it to the `notIn` list in
+  the three exclusion filters (`MerchantProductSync` eligibility,
+  `google-merchant-oauth` selectable + validate).
+- When a second connector lands, extract `clover-demo-emulator.ts`'s scenario
+  engine + item catalog into a shared `pos-demo` service with thin
+  per-provider adapters.
+
 ### 9.4 Reviewer instructions — submission-ready text
 
 Paste-ready for the "Instructions for Reviewers" field. No test-merchant
@@ -819,9 +853,11 @@ merchant; the steps below are what they click.
 2. You land on a short signup: name your store, pick a plan (every plan starts
    with a 14-day free trial — no card required), and create an account.
 3. Optional test drive: before connecting, **Enable Demo Mode** on the
-   integrations page fills the catalog with 25 sample products so you can
-   explore sync and mapping. Demo items never reach Google, and connecting a
-   real account clears them automatically — demo and live never coexist.
+   integrations page fills the catalog with 25 sample products. The Simulate
+   tab then exercises the full sync vocabulary — item add/update/delete,
+   stock and price changes, conflicts, sync failures, and category
+   add/rename/moves. Demo items never reach Google, and connecting a real
+   account clears them automatically — demo and live never coexist.
 4. Clover then shows its permission screen. Note the scopes: the app requests
    **read-only** access to inventory and business information. It cannot touch
    orders, payments, customers, or the register — Clover enforces that. Approve

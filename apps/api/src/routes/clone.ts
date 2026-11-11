@@ -130,6 +130,13 @@ router.post('/product', authenticateToken, requireWritableSubscription, async (r
       newName = `${originalProduct.name} ${randomSuffix}`;
     }
 
+    // Clone is a real merchant item — strip demo provenance so it isn't
+    // tagged isDemoData/demo_item_* forever (source defaults to MANUAL).
+    const cleanMetadata = { ...(originalProduct.metadata as Record<string, unknown> | null) };
+    delete cleanMetadata.isDemoData;
+    delete cleanMetadata.cloverItemId;
+    delete cleanMetadata.cloverCategory;
+
     // Create the cloned product
     const clonedProduct = await prisma.inventory_items.create({
       data: {
@@ -153,7 +160,7 @@ router.post('/product', authenticateToken, requireWritableSubscription, async (r
         mpn: originalProduct.mpn,
         image_url: originalProduct.image_url,
         image_gallery: originalProduct.image_gallery,
-        metadata: originalProduct.metadata as any,
+        metadata: cleanMetadata as any,
         custom_cta: originalProduct.custom_cta as any,
         social_links: originalProduct.social_links as any,
         custom_branding: originalProduct.custom_branding as any,

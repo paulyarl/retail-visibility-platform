@@ -31,6 +31,25 @@ export interface PosStockDiff {
   posItemId?: string;
 }
 
+/**
+ * Full-field POS diff — the wide vocabulary lanes reconcile on. Mirrors the
+ * demo scenario vocabulary: stock_update, price_update, name change, and
+ * category_items_moved all ride the same diff. Only fields actually present
+ * are compared/written; absent fields leave the item alone.
+ */
+export interface PosItemDiff {
+  inventoryItemId: string;
+  source: PosStockSource;
+  /** Provider-side id (clover_item_id / square variation id) — log only. */
+  posItemId?: string;
+  name?: string;
+  priceCents?: number;
+  salePriceCents?: number | null;
+  stock?: number;
+  /** VS directory_category id resolved from the POS category mapping. */
+  directoryCategoryId?: string | null;
+}
+
 export interface ReconcileResult {
   updated: number;
   /** Already in sync — processed successfully, nothing to write. */
@@ -86,6 +105,83 @@ class PosStockSyncService {
         });
         updated++;
         if (item.swis_listed) swisDirty.push(item.id);
+      } catch (err) {
+        failed++;
+        logger.warn('[PosStockSync] reconcile item failed (non-fatal)', undefined, {
+          tenantId,
+          inventoryItemId: diff.inventoryItemId,
+          source: diff.source,
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
+    }
+
+    return { updated, skipped, failed, swisDirty };
+  }
+
+  /**
+   * Apply full-field POS diffs to inventory_items. Same contract as
+   * reconcileStock — unchanged items skip, per-item idempotent — but diffs
+   * carry every Clover-owned field. A swis_listed item goes dirty when its
+   * price OR stock moves (both ride the local-inventory payload); name and
+   * category changes stay catalog-side.
+   */
+  async reconcileItems(
+    tenantId: string,
+    diffs: PosItemDiff[],
+    _ctx?: unknown,
+  ): Promise<ReconcileResult> {
+    let updated = 0;
+    let skipped = 0;
+    let failed = 0;
+    const swisDirty: string[] = [];
+
+    for (const diff of diffs) {
+      try {
+        const item = await prisma.inventory_items.findUnique({
+          where: { id: diff.inventoryItemId },
+          select: {
+            id: true, name: true, price_cents: true, sale_price_cents: true,
+            stock: true, directory_category_id: true, swis_listed: true,
+          },
+        });
+        if (!item) {
+          failed++;
+          continue;
+        }
+
+        const data: Record<string, unknown> = {};
+        let priceMoved = false;
+        let stockMoved = false;
+        if (diff.name !== undefined && diff.name !== item.name) data.name = diff.name;
+        if (diff.priceCents !== undefined && diff.priceCents !== item.price_cents) {
+          data.price_cents = diff.priceCents;
+          data.price = diff.priceCents / 100;
+          priceMoved = true;
+        }
+        if (diff.salePriceCents !== undefined && diff.salePriceCents !== item.sale_price_cents) {
+          data.sale_price_cents = diff.salePriceCents;
+          priceMoved = true;
+        }
+        if (diff.stock !== undefined) {
+          const newStock = Math.max(0, Math.floor(diff.stock));
+          if (newStock !== (item.stock ?? 0)) {
+            data.stock = newStock;
+            stockMoved = true;
+          }
+        }
+        if (diff.directoryCategoryId !== undefined && diff.directoryCategoryId !== item.directory_category_id) {
+          data.directory_category_id = diff.directoryCategoryId;
+        }
+
+        if (Object.keys(data).length === 0) {
+          skipped++;
+          continue;
+        }
+        data.updated_at = new Date();
+        await prisma.inventory_items.update({ where: { id: item.id }, data });
+        updated++;
+        if (item.swis_listed && (stockMoved || priceMoved)) swisDirty.push(item.id);
       } catch (err) {
         failed++;
         logger.warn('[PosStockSync] reconcile item failed (non-fatal)', undefined, {

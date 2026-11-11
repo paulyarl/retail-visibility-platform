@@ -1758,56 +1758,81 @@ async function fetchCloverInventory(integration: any): Promise<{ categories: any
     try {
       console.log('[Clover Sync] Using real Clover API...');
       
-      // Fetch categories from Clover
+      // Fetch categories from Clover (paginated — Clover's default page is 100)
       const authHeaders = { 'Authorization': `Bearer ${decryptToken(integration.access_token)}` };
 
-      const categoriesResponse = await fetch(
-        `${cloverApiBaseUrl()}/v3/merchants/${integration.merchant_id}/categories`,
-        { headers: authHeaders }
-      );
-      if (!categoriesResponse.ok) {
-        throw new Error(`clover_categories_${categoriesResponse.status}: ${(await categoriesResponse.text()).slice(0, 200)}`);
+      const allCategories: any[] = [];
+      let catOffset = 0;
+      for (;;) {
+        const categoriesResponse = await fetch(
+          `${cloverApiBaseUrl()}/v3/merchants/${integration.merchant_id}/categories?limit=1000&offset=${catOffset}`,
+          { headers: authHeaders }
+        );
+        if (!categoriesResponse.ok) {
+          throw new Error(`clover_categories_${categoriesResponse.status}: ${(await categoriesResponse.text()).slice(0, 200)}`);
+        }
+        const categoriesData = await categoriesResponse.json() as { elements?: any[] };
+        const elements = categoriesData.elements || [];
+        allCategories.push(...elements);
+        if (elements.length < 1000) break;
+        catOffset += 1000;
       }
-      const categoriesData = await categoriesResponse.json() as { elements?: any[] };
 
-      // Fetch items from Clover
-      const itemsResponse = await fetch(
-        `${cloverApiBaseUrl()}/v3/merchants/${integration.merchant_id}/items?expand=categories`,
-        { headers: authHeaders }
-      );
-      if (!itemsResponse.ok) {
-        throw new Error(`clover_items_${itemsResponse.status}: ${(await itemsResponse.text()).slice(0, 200)}`);
+      // Fetch items from Clover — full paginated set; the delete/archive pass
+      // treats absence from this list as "deleted in Clover", so a partial
+      // list would mass-archive real items.
+      const allItems: any[] = [];
+      let itemOffset = 0;
+      for (;;) {
+        const itemsResponse = await fetch(
+          `${cloverApiBaseUrl()}/v3/merchants/${integration.merchant_id}/items?expand=categories&limit=1000&offset=${itemOffset}`,
+          { headers: authHeaders }
+        );
+        if (!itemsResponse.ok) {
+          throw new Error(`clover_items_${itemsResponse.status}: ${(await itemsResponse.text()).slice(0, 200)}`);
+        }
+        const itemsData = await itemsResponse.json() as { elements?: any[] };
+        const elements = itemsData.elements || [];
+        allItems.push(...elements);
+        if (elements.length < 1000) break;
+        itemOffset += 1000;
       }
-      const itemsData = await itemsResponse.json() as { elements?: any[] };
 
       // item_stocks is Clover's authoritative stock source — the stockCount
       // field on /items is denormalized and reads 0 for stock-tracked items.
-      const stocksResponse = await fetch(
-        `${cloverApiBaseUrl()}/v3/merchants/${integration.merchant_id}/item_stocks`,
-        { headers: authHeaders }
-      );
+      // Paginated — same >100 truncation risk as items.
       const stockByItemId = new Map<string, number>();
-      if (stocksResponse.ok) {
+      let stockOffset = 0;
+      for (;;) {
+        const stocksResponse = await fetch(
+          `${cloverApiBaseUrl()}/v3/merchants/${integration.merchant_id}/item_stocks?limit=1000&offset=${stockOffset}`,
+          { headers: authHeaders }
+        );
+        if (!stocksResponse.ok) {
+          logger.warn('[Clover Sync] item_stocks fetch failed — stock counts may be stale', undefined, {
+            merchantId: integration.merchant_id,
+            httpStatus: stocksResponse.status,
+          });
+          break;
+        }
         const stocksData = await stocksResponse.json() as { elements?: Array<{ item?: { id?: string }; stockCount?: number }> };
-        for (const el of stocksData.elements || []) {
+        const elements = stocksData.elements || [];
+        for (const el of elements) {
           if (el.item?.id) stockByItemId.set(el.item.id, el.stockCount ?? 0);
         }
-      } else {
-        logger.warn('[Clover Sync] item_stocks fetch failed — stock counts may be stale', undefined, {
-          merchantId: integration.merchant_id,
-          httpStatus: stocksResponse.status,
-        });
+        if (elements.length < 1000) break;
+        stockOffset += 1000;
       }
 
       // Transform Clover API response to our format
-      const categories = (categoriesData.elements || []).map((cat: any) => ({
+      const categories = allCategories.map((cat: any) => ({
         id: cat.id,
         name: cat.name,
         sortOrder: cat.sortOrder || 0,
         parentId: null
       }));
-      
-      const items = (itemsData.elements || []).map((item: any) => ({
+
+      const items = allItems.map((item: any) => ({
         id: item.id,
         name: item.name,
         sku: item.sku || item.code || `CLV-${item.id.substring(0, 8)}`,
@@ -1899,6 +1924,8 @@ router.post('/:tenantId/clover/sync', authenticateToken, checkTenantAccess, requ
     let itemsCreated = 0;
     let itemsUpdated = 0;
     let itemsFailed = 0;
+    let conflictsCreated = 0;
+    let itemsArchived = 0;
     const itemErrorDetails: string[] = [];
 
     // ========================================
@@ -1920,9 +1947,24 @@ router.post('/:tenantId/clover/sync', authenticateToken, checkTenantAccess, requ
           let rvpCategoryId: string | null = null;
 
           if (categoryMapping && categoryMapping.rvp_category_id) {
-            // Category already mapped
+            // Category already mapped — propagate a Clover-side rename
+            // (category_renamed: the register is source of truth for names).
             rvpCategoryId = categoryMapping.rvp_category_id;
             categoriesMapped++;
+            if (categoryMapping.rvp_category_name !== cloverCat.name) {
+              await prisma.directory_category.update({
+                where: { id: rvpCategoryId },
+                data: { name: cloverCat.name, updatedAt: new Date() }
+              });
+              await prisma.clover_category_mappings_list.update({
+                where: { id: categoryMapping.id },
+                data: {
+                  clover_category_name: cloverCat.name,
+                  rvp_category_name: cloverCat.name,
+                  updated_at: new Date()
+                }
+              });
+            }
           } else {
             // Create or find VisibleShelf category
             const slug = cloverCat.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
@@ -2016,6 +2058,12 @@ router.post('/:tenantId/clover/sync', authenticateToken, checkTenantAccess, requ
           }
         });
 
+        if (itemMapping && itemMapping.mapping_status === 'conflict') {
+          // Unresolved conflict — don't overwrite; merchant resolves via the
+          // Mappings tab (use_clover / use_rvp / custom).
+          continue;
+        }
+
         if (itemMapping && itemMapping.rvp_item_id) {
           // Item already mapped - update if requested
           if (updateExisting) {
@@ -2043,6 +2091,42 @@ router.post('/:tenantId/clover/sync', authenticateToken, checkTenantAccess, requ
             itemsUpdated++;
           }
         } else if (importNew) {
+          // SKU collision with an existing unmapped item → conflict, not a
+          // duplicate. The merchant resolves it on the Mappings tab; the row
+          // points at the colliding item so the resolve endpoint can apply
+          // use_clover / custom onto it.
+          const skuOwner = await prisma.inventory_items.findFirst({
+            where: { tenant_id: tenantId, sku: cloverItem.sku },
+            select: { id: true }
+          });
+          if (skuOwner) {
+            await prisma.clover_item_mappings_list.upsert({
+              where: { id: itemMapping?.id || generateCloverItemMappingsId() },
+              create: {
+                id: generateCloverItemMappingsId(),
+                integration_id: integration.id,
+                clover_item_id: cloverItem.id,
+                clover_item_name: cloverItem.name,
+                clover_sku: cloverItem.sku,
+                rvp_item_id: skuOwner.id,
+                rvp_sku: cloverItem.sku,
+                mapping_status: 'conflict',
+                last_synced_at: new Date(),
+                last_sync_status: 'conflict',
+                updated_at: new Date()
+              } as any,
+              update: {
+                rvp_item_id: skuOwner.id,
+                rvp_sku: cloverItem.sku,
+                mapping_status: 'conflict',
+                last_sync_status: 'conflict',
+                updated_at: new Date()
+              }
+            });
+            conflictsCreated++;
+            continue;
+          }
+
           // Create new VisibleShelf item
           const newItem = await prisma.inventory_items.create({
             data: {
@@ -2110,6 +2194,38 @@ router.post('/:tenantId/clover/sync', authenticateToken, checkTenantAccess, requ
       }
     }
 
+    // ========================================
+    // STEP 3: Archive items deleted in Clover
+    // ========================================
+    // Same vocabulary as demo 'item_deleted': archive, never hard-delete —
+    // photos and enrichment survive if Clover ever brings the item back.
+    // Safe only because fetchCloverInventory returns a complete paginated set.
+    {
+      const cloverItemIds = new Set(cloverData.items.map((i: any) => i.id));
+      const staleMappings = await prisma.clover_item_mappings_list.findMany({
+        where: {
+          integration_id: integration.id,
+          rvp_item_id: { not: null },
+          // Only Clover-managed items archive — a 'conflict' mapping points
+          // at a merchant-owned item that must outlive a Clover-side delete.
+          mapping_status: 'mapped',
+          clover_item_id: { notIn: [...cloverItemIds] }
+        },
+        select: { id: true, rvp_item_id: true }
+      });
+      for (const stale of staleMappings) {
+        await prisma.inventory_items.update({
+          where: { id: stale.rvp_item_id! },
+          data: { item_status: 'archived', updated_at: new Date() }
+        });
+        await prisma.clover_item_mappings_list.update({
+          where: { id: stale.id },
+          data: { last_sync_status: 'archived', updated_at: new Date() }
+        });
+        itemsArchived++;
+      }
+    }
+
     // Update sync log with results
     const duration = Date.now() - startTime;
     await prisma.clover_sync_logs_list.update({
@@ -2148,7 +2264,9 @@ router.post('/:tenantId/clover/sync', authenticateToken, checkTenantAccess, requ
           total: cloverData.items.length,
           created: itemsCreated,
           updated: itemsUpdated,
-          failed: itemsFailed
+          failed: itemsFailed,
+          conflicts: conflictsCreated,
+          archived: itemsArchived
         }
       },
       dataSource: useRealApi ? 'clover_api' : 'mock_data'
