@@ -60,6 +60,24 @@ export interface ReconcileResult {
   swisDirty: string[];
 }
 
+/**
+ * One applied field change — the production mirror of the demo simulator's
+ * result rows. Callers fold these into sync_log auditTrail so the History
+ * tab shows old → new per field, not just counts.
+ */
+export interface PosItemChange {
+  itemId: string;
+  itemName: string;
+  sku: string;
+  field: 'name' | 'price' | 'sale_price' | 'stock' | 'category';
+  oldValue: unknown;
+  newValue: unknown;
+}
+
+export interface ReconcileItemsResult extends ReconcileResult {
+  changes: PosItemChange[];
+}
+
 export interface SwisPushResult {
   pushed: number;
   /** Items failing the SWIS gate or with no usable merchant link. */
@@ -130,18 +148,19 @@ class PosStockSyncService {
     tenantId: string,
     diffs: PosItemDiff[],
     _ctx?: unknown,
-  ): Promise<ReconcileResult> {
+  ): Promise<ReconcileItemsResult> {
     let updated = 0;
     let skipped = 0;
     let failed = 0;
     const swisDirty: string[] = [];
+    const changes: PosItemChange[] = [];
 
     for (const diff of diffs) {
       try {
         const item = await prisma.inventory_items.findUnique({
           where: { id: diff.inventoryItemId },
           select: {
-            id: true, name: true, price_cents: true, sale_price_cents: true,
+            id: true, name: true, sku: true, price_cents: true, sale_price_cents: true,
             stock: true, directory_category_id: true, swis_listed: true,
           },
         });
@@ -151,27 +170,35 @@ class PosStockSyncService {
         }
 
         const data: Record<string, unknown> = {};
+        const changed: Array<Pick<PosItemChange, 'field' | 'oldValue' | 'newValue'>> = [];
         let priceMoved = false;
         let stockMoved = false;
-        if (diff.name !== undefined && diff.name !== item.name) data.name = diff.name;
+        if (diff.name !== undefined && diff.name !== item.name) {
+          data.name = diff.name;
+          changed.push({ field: 'name', oldValue: item.name, newValue: diff.name });
+        }
         if (diff.priceCents !== undefined && diff.priceCents !== item.price_cents) {
           data.price_cents = diff.priceCents;
           data.price = diff.priceCents / 100;
+          changed.push({ field: 'price', oldValue: item.price_cents, newValue: diff.priceCents });
           priceMoved = true;
         }
         if (diff.salePriceCents !== undefined && diff.salePriceCents !== item.sale_price_cents) {
           data.sale_price_cents = diff.salePriceCents;
+          changed.push({ field: 'sale_price', oldValue: item.sale_price_cents, newValue: diff.salePriceCents });
           priceMoved = true;
         }
         if (diff.stock !== undefined) {
           const newStock = Math.max(0, Math.floor(diff.stock));
           if (newStock !== (item.stock ?? 0)) {
             data.stock = newStock;
+            changed.push({ field: 'stock', oldValue: item.stock ?? 0, newValue: newStock });
             stockMoved = true;
           }
         }
         if (diff.directoryCategoryId !== undefined && diff.directoryCategoryId !== item.directory_category_id) {
           data.directory_category_id = diff.directoryCategoryId;
+          changed.push({ field: 'category', oldValue: item.directory_category_id, newValue: diff.directoryCategoryId });
         }
 
         if (Object.keys(data).length === 0) {
@@ -181,6 +208,9 @@ class PosStockSyncService {
         data.updated_at = new Date();
         await prisma.inventory_items.update({ where: { id: item.id }, data });
         updated++;
+        for (const c of changed) {
+          changes.push({ itemId: item.id, itemName: item.name, sku: item.sku ?? '', ...c });
+        }
         if (item.swis_listed && (stockMoved || priceMoved)) swisDirty.push(item.id);
       } catch (err) {
         failed++;
@@ -193,7 +223,7 @@ class PosStockSyncService {
       }
     }
 
-    return { updated, skipped, failed, swisDirty };
+    return { updated, skipped, failed, swisDirty, changes };
   }
 
   /**
