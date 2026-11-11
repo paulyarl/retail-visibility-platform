@@ -1654,17 +1654,25 @@ async function fetchCloverInventory(integration: any): Promise<{ categories: any
       console.log('[Clover Sync] Using real Clover API...');
       
       // Fetch categories from Clover
+      const authHeaders = { 'Authorization': `Bearer ${decryptToken(integration.access_token)}` };
+
       const categoriesResponse = await fetch(
         `${cloverApiBaseUrl()}/v3/merchants/${integration.merchant_id}/categories`,
-        { headers: { 'Authorization': `Bearer ${decryptToken(integration.access_token)}` } }
+        { headers: authHeaders }
       );
+      if (!categoriesResponse.ok) {
+        throw new Error(`clover_categories_${categoriesResponse.status}: ${(await categoriesResponse.text()).slice(0, 200)}`);
+      }
       const categoriesData = await categoriesResponse.json() as { elements?: any[] };
-      
+
       // Fetch items from Clover
       const itemsResponse = await fetch(
         `${cloverApiBaseUrl()}/v3/merchants/${integration.merchant_id}/items?expand=categories`,
-        { headers: { 'Authorization': `Bearer ${decryptToken(integration.access_token)}` } }
+        { headers: authHeaders }
       );
+      if (!itemsResponse.ok) {
+        throw new Error(`clover_items_${itemsResponse.status}: ${(await itemsResponse.text()).slice(0, 200)}`);
+      }
       const itemsData = await itemsResponse.json() as { elements?: any[] };
       
       // Transform Clover API response to our format
@@ -1689,7 +1697,10 @@ async function fetchCloverInventory(integration: any): Promise<{ categories: any
       return { categories, items };
       
     } catch (error) {
-      logger.error('[Clover Sync] Real API call failed, falling back to mock data:', requestContextStorage.getStore(), { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+      // Never fall back to mock on a real-API failure — that silently
+      // overwrites live inventory with fixture data. Fail the sync instead.
+      logger.error('[Clover Sync] Real API call failed:', requestContextStorage.getStore(), { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+      throw error;
     }
   }
 
@@ -1709,6 +1720,9 @@ async function fetchCloverInventory(integration: any): Promise<{ categories: any
  * Supports 2-way category sync
  */
 router.post('/:tenantId/clover/sync', authenticateToken, checkTenantAccess, requireTierFeature('integration_clover'), async (req: Request, res: Response) => {
+  let syncLogId: string | null = null;
+  let integrationId: string | null = null;
+  let startTime = 0;
   try {
     const { tenantId } = req.params;
     const { 
@@ -1722,6 +1736,7 @@ router.post('/:tenantId/clover/sync', authenticateToken, checkTenantAccess, requ
     const integration = await prisma.clover_integrations_list.findFirst({
       where: { tenant_id: tenantId }
     });
+    integrationId = integration?.id || null;
 
     if (!integration) {
       return res.status(404).json({ error: 'integration_not_found' });
@@ -1736,8 +1751,8 @@ router.post('/:tenantId/clover/sync', authenticateToken, checkTenantAccess, requ
 
     // Create sync log entry
     //const syncLogId = crypto.randomUUID();
-    const syncLogId = generateCloverSyncLogId();
-    const startTime = Date.now();
+    syncLogId = generateCloverSyncLogId();
+    startTime = Date.now();
     
     await prisma.clover_sync_logs_list.create({
       data: {
@@ -2016,6 +2031,25 @@ router.post('/:tenantId/clover/sync', authenticateToken, checkTenantAccess, requ
 
   } catch (error: any) {
     logger.error('[POST /clover/sync] Error:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    // Don't leave the sync-log row stuck at in_progress — mark it failed
+    // with the real error so History shows what actually happened.
+    if (syncLogId) {
+      await prisma.clover_sync_logs_list.updateMany({
+        where: { id: syncLogId, status: 'in_progress' },
+        data: {
+          status: 'failed',
+          error_message: error.message,
+          completed_at: new Date(),
+          duration_ms: Date.now() - startTime
+        }
+      }).catch(() => {});
+    }
+    if (integrationId) {
+      await prisma.clover_integrations_list.update({
+        where: { id: integrationId },
+        data: { last_sync_at: new Date(), last_sync_status: 'failed' }
+      }).catch(() => {});
+    }
     return res.status(500).json({ error: 'internal_error', message: error.message });
   }
 });
