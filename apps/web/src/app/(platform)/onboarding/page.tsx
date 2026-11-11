@@ -11,6 +11,7 @@ import { onboardingStateService } from '@/services/OnboardingStateService';
 import { usePlatformSettings } from '@/contexts/PlatformSettingsContext';
 import Image from 'next/image';
 import { clientLogger } from '@/lib/client-logger';
+import { laneFromPhase1, laneExit } from '@/lib/onboarding/lanes';
 
 const ONBOARDING_STEPS = [
   { id: 'welcome', title: 'Welcome to VisibleShelf!', description: 'Let\'s get your account set up' },
@@ -152,10 +153,16 @@ function OnboardingContent() {
     }
   };
 
+  // Lane arrivals (Clover App Market, directory claim, ...) continue to the
+  // lane's exit once the tenant exists instead of generic phase-2 onboarding.
+  const postTenantDest = (tenantId: string, fromPhase1 = false) =>
+    laneExit(laneFromPhase1(onboardingStateService.getPhase1()), tenantId)
+      ?? `/t/${tenantId}/onboarding${fromPhase1 ? '?fromPhase1=true' : ''}`;
+
   const handleGoToTenants = () => {
     const tenantId = searchParams.get('tenantId') || savedProfile?.tenant?.id;
     if (tenantId) {
-      router.replace(`/t/${tenantId}/onboarding`);
+      router.replace(postTenantDest(tenantId));
     } else {
       // Pass onboarding data to /tenants for "Add New Location" modal
       const params = new URLSearchParams();
@@ -171,7 +178,7 @@ function OnboardingContent() {
     const tenantId = savedProfile?.tenant?.id;
     if (tenantId) {
       // Phase 1 already marked complete, just navigate
-      router.push(`/t/${tenantId}/onboarding?fromPhase1=true`);
+      router.push(postTenantDest(tenantId, true));
     } else {
       // Pass onboarding data to /tenants for "Add New Location" modal
       const params = new URLSearchParams();
@@ -542,7 +549,7 @@ function OnboardingContent() {
                             key={tenant.id}
                             onClick={() => {
                               onboardingStateService.completePhase1(tenant.id);
-                              router.push(`/t/${tenant.id}/onboarding?fromPhase1=true`);
+                              router.push(postTenantDest(tenant.id, true));
                             }}
                             className="w-full p-4 bg-white border border-neutral-200 rounded-lg hover:border-primary-300 hover:bg-primary-50 transition-colors text-left flex items-center justify-between group"
                           >

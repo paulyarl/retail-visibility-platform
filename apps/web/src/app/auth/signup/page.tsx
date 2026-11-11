@@ -13,7 +13,7 @@ export default function SignupPage() {
 
   useEffect(() => {
     // Redirect to the new signup wizard
-    router.replace('/auth/signup/wizard');
+    router.replace(`/auth/signup/wizard${window.location.search}`);
   }, [router]);
 
   return (

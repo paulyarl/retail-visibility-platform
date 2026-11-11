@@ -20,6 +20,7 @@ interface CloverIntegrationData {
   demoEnabledAt?: string;
   demoLastActiveAt?: string;
   lastSyncAt?: string;
+  lastSyncStatus?: string | null;
 }
 
 interface CloverOAuthData {

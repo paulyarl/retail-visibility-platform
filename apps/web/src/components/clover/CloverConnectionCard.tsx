@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { Package, ExternalLink, Settings, RefreshCw, CheckCircle2, ArrowRight } from 'lucide-react';
+import { Package, ExternalLink, Settings, RefreshCw, CheckCircle2, ArrowRight, AlertTriangle } from 'lucide-react';
 import { Button } from '@mantine/core';
 import { CloverStatusBadge, CloverStatus } from './CloverStatusBadge';
 import { CloverDemoModeToggle } from './CloverDemoModeToggle';
@@ -14,6 +14,7 @@ interface CloverConnectionCardProps {
   isEnabled: boolean;
   mode?: 'demo' | 'production' | null;
   lastSyncAt?: string;
+  lastSyncStatus?: string | null;
   stats?: {
     totalItems: number;
     mappedItems: number;
@@ -35,6 +36,7 @@ export function CloverConnectionCard({
   isEnabled,
   mode,
   lastSyncAt,
+  lastSyncStatus,
   stats,
   onConnect,
   onDisconnect,
@@ -195,6 +197,61 @@ export function CloverConnectionCard({
                 {formatDate(lastSyncAt)}
               </span>
             </div>
+
+            {/* Sync health — a Connected badge hiding a failing sync is worse
+                than an honest error. Render the real state + the fix action. */}
+            {lastSyncStatus === 'token_expired' && (
+              <div className="flex items-start gap-3 p-4 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-800">
+                <AlertTriangle className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-red-900 dark:text-red-100">
+                    Clover connection expired
+                  </p>
+                  <p className="text-sm text-red-700 dark:text-red-300 mt-1">
+                    Reconnect to resume automatic stock and price syncing.
+                  </p>
+                  {onConnect && showActions && (
+                    <Button
+                      variant="gradient"
+                      style={{ color: 'white' }}
+                      size="sm"
+                      onClick={onConnect}
+                      className="mt-3 bg-red-600 hover:bg-red-700"
+                    >
+                      <ExternalLink className="h-4 w-4 mr-2" />
+                      Reconnect Clover
+                    </Button>
+                  )}
+                </div>
+              </div>
+            )}
+            {lastSyncStatus === 'module_missing' && (
+              <div className="flex items-start gap-3 p-4 bg-amber-50 dark:bg-amber-900/20 rounded-lg border border-amber-200 dark:border-amber-800">
+                <AlertTriangle className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-amber-900 dark:text-amber-100">
+                    Clover Inventory module not available
+                  </p>
+                  <p className="text-sm text-amber-700 dark:text-amber-300 mt-1">
+                    Your Clover plan doesn't include the Inventory app, so there's
+                    nothing to sync. Upgrade your Clover plan or disconnect.
+                  </p>
+                </div>
+              </div>
+            )}
+            {lastSyncStatus === 'failed' && (
+              <div className="flex items-start gap-3 p-4 bg-amber-50 dark:bg-amber-900/20 rounded-lg border border-amber-200 dark:border-amber-800">
+                <AlertTriangle className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-amber-900 dark:text-amber-100">
+                    Last sync failed
+                  </p>
+                  <p className="text-sm text-amber-700 dark:text-amber-300 mt-1">
+                    Check History for the error, or run Sync Now to retry.
+                  </p>
+                </div>
+              </div>
+            )}
 
             {showActions && (
               <div className="flex gap-2">

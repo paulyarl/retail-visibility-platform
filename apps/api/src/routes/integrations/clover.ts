@@ -27,7 +27,8 @@ import {
   decryptToken,
   cloverApiBaseUrl,
   calculateTokenExpiration,
-  formatScopesForDisplay
+  formatScopesForDisplay,
+  getCloverConfig
 } from '../../services/clover-oauth';
 import { generateCloverCatId, generateCloverIntegrationId, generateCloverItemId, generateCloverItemMappingsId, generateCloverOauthChangeLogId, generateCloverSyncLogId, generateProductCatId } from '../../lib/id-generator';
  
@@ -502,8 +503,21 @@ router.get('/:tenantId/clover/oauth/authorize', authenticateToken, checkTenantAc
 router.get('/clover/launch', async (req: Request, res: Response) => {
   try {
     const merchantId = req.query.merchant_id as string | undefined;
-    let tenantId: string | null = null;
+    const clientId = req.query.client_id as string | undefined;
 
+    // Validate client_id when Clover sends it — a launch carrying another
+    // app's client_id must not route into our tenants' settings pages.
+    try {
+      if (clientId && clientId !== getCloverConfig().clientId) {
+        logger.warn('[GET /clover/launch] client_id mismatch — refusing tenant route', undefined, { merchantId });
+        return res.redirect(`${unifiedConfig.webUrl}/signup`);
+      }
+    } catch {
+      // Clover config absent — can't validate; fall through without a tenant route
+      return res.redirect(`${unifiedConfig.webUrl}/signup`);
+    }
+
+    let tenantId: string | null = null;
     if (merchantId) {
       const integration = await prisma.clover_integrations_list.findFirst({
         where: { merchant_id: merchantId },
@@ -512,10 +526,18 @@ router.get('/clover/launch', async (req: Request, res: Response) => {
       tenantId = integration?.tenant_id || null;
     }
 
-    const target = tenantId
-      ? `${unifiedConfig.webUrl}/t/${tenantId}/settings/integrations?clover=installed`
-      : `${unifiedConfig.webUrl}/settings/integrations?clover=installed`;
-    return res.redirect(target);
+    if (tenantId) {
+      return res.redirect(`${unifiedConfig.webUrl}/t/${tenantId}/settings/integrations?clover=installed`);
+    }
+
+    // Unbound first install: no integration row → no tenant to route to.
+    // Send straight to the signup wizard (the /signup and /auth/signup
+    // pages are client-side redirect stubs that drop query params) on the
+    // clover_market onboarding lane — the lane registry supplies the
+    // preselected tier and the post-signup exit back into Clover OAuth.
+    const params = new URLSearchParams({ lane: 'clover_market' });
+    if (merchantId) params.set('merchant_id', merchantId);
+    return res.redirect(`${unifiedConfig.webUrl}/auth/signup/wizard?${params.toString()}`);
   } catch (error: any) {
     logger.error('[GET /clover/launch] Error:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.redirect(`${unifiedConfig.webUrl}`);
@@ -622,6 +644,28 @@ router.get('/clover/oauth/callback', async (req: Request, res: Response) => {
         reason: 'OAuth connection established for Clover POS'
       }
     });
+
+    // Probe the Inventory module before declaring victory — merchants on
+    // Clover plans without it get a 403/404 here, not a silent Connected
+    // badge that can never sync.
+    try {
+      const probeRes = await fetch(
+        `${cloverApiBaseUrl()}/v3/merchants/${merchantId}/item_stocks?limit=1`,
+        { headers: { Authorization: `Bearer ${tokenData.access_token}` } }
+      );
+      if (probeRes.status === 403 || probeRes.status === 404) {
+        await prisma.clover_integrations_list.update({
+          where: { id: integration.id },
+          data: { last_sync_status: 'module_missing' }
+        });
+        logger.error('[OAuth Callback] Merchant lacks Clover Inventory module', req.ctx);
+        return res.redirect(`${unifiedConfig.webUrl}/t/${tenantId}/settings/integrations?error=inventory_module_missing`);
+      }
+    } catch (probeErr) {
+      // Probe failure isn't fatal — the scheduled sync will surface a real
+      // error state. Only a definitive 403/404 blocks the connect.
+      logger.error('[OAuth Callback] Inventory module probe failed', req.ctx);
+    }
 
     // Redirect back to integrations page with success message
     return res.redirect(`${unifiedConfig.webUrl}/t/${tenantId}/settings/integrations?success=connected`);
@@ -2110,7 +2154,9 @@ router.post('/:tenantId/clover/sync', authenticateToken, checkTenantAccess, requ
 /**
  * Disconnect Clover integration (Production Mode)
  */
-router.post('/:tenantId/clover/disconnect', authenticateToken, checkTenantAccess, requireTierFeature('integration_clover'), async (req: Request, res: Response) => {
+// Disconnect is deliberately NOT tier-gated: a downgraded or trial-expired
+// tenant must always be able to revoke the connection and clear its tokens.
+router.post('/:tenantId/clover/disconnect', authenticateToken, checkTenantAccess, async (req: Request, res: Response) => {
   try {
     const { tenantId } = req.params;
     const { keepItems = true } = req.body;

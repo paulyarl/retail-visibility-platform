@@ -33,6 +33,15 @@ export interface Phase1Data {
   utmCampaign?: string;
   utmContent?: string;
   utmTerm?: string;
+
+  // Onboarding lane — which entrance channel this signup arrived through
+  // (see lib/onboarding/lanes.ts). Drives the post-tenant-creation exit.
+  lane?: { id: string; params: Record<string, string> };
+
+  // Legacy Clover App Market marker — superseded by `lane`, kept so in-flight
+  // onboarding state from before the lane refactor still resolves.
+  cloverInstalled?: boolean;
+  cloverMerchantId?: string;
   
   // Timestamps
   completedAt?: string;

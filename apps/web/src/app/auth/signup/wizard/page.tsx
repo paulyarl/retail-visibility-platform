@@ -10,6 +10,7 @@ import { getUTMParamsFromUrl, storeUTMParams } from '@/lib/utm';
 import { tenantManagementService } from '@/services/TenantManagementService';
 import { clientLogger } from '@/lib/client-logger';
 import { TIER_DISPLAY_NAMES, TIER_PRICING } from '@/lib/tiers/tier-features';
+import { ONBOARDING_LANES, parseLaneFromSearch, laneFromPhase1, laneExit, LaneState } from '@/lib/onboarding/lanes';
 
 /**
  * Auth0-Connected Signup Wizard
@@ -45,13 +46,19 @@ export default function SignupWizardPage() {
     const existingState = onboardingStateService.getPhase1();
     // console.log('[SignupWizard] Restoring from onboardingStateService:', existingState);
     
-    // Check if there's a tier parameter in the URL
+    // Resolve the onboarding lane (entrance channel → tier → exit) plus an
+    // explicit tier override — `?tier=` wins over the lane's default.
     let urlTier = '';
+    let lane: LaneState | null = null;
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search);
       const tierParam = params.get('tier');
       if (tierParam) {
         urlTier = tierParam;
+      }
+      lane = parseLaneFromSearch(window.location.search);
+      if (!urlTier && lane && ONBOARDING_LANES[lane.id]?.tier) {
+        urlTier = ONBOARDING_LANES[lane.id].tier!;
       }
     }
 
@@ -65,6 +72,7 @@ export default function SignupWizardPage() {
       utmCampaign: utmParams.utm_campaign,
       utmContent: utmParams.utm_content,
       utmTerm: utmParams.utm_term,
+      ...(lane ? { lane } : {}),
     };
     onboardingStateService.savePhase1(attribution);
 
@@ -309,8 +317,9 @@ export default function SignupWizardPage() {
               preferredTier: formData.preferredTier,
             });
             
-            // Redirect to dashboard
-            router.replace(`/t/${existingUserData.id}/dashboard`);
+            // Lane arrivals (e.g. Clover App Market) continue to the lane's exit
+            const lane = laneFromPhase1(onboardingStateService.getPhase1());
+            router.replace(laneExit(lane, existingUserData.id) ?? `/t/${existingUserData.id}/dashboard`);
           } else {
             throw new Error('Failed to update tenant data');
           }
