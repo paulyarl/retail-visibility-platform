@@ -460,7 +460,10 @@ router.get('/:tenantId/clover/oauth/authorize', authenticateToken, checkTenantAc
       where: { tenant_id: tenantId }
     });
 
-    if (integration && integration.mode === 'production') {
+    // "Already connected" means a live production connection — a
+    // disconnected row (status/token cleared) must be re-authorizable.
+    if (integration && integration.mode === 'production'
+        && integration.status === 'active' && integration.access_token) {
       return res.status(400).json({
         error: 'already_connected',
         message: 'Clover account already connected'
