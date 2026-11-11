@@ -55,7 +55,7 @@ describe('reconcileStock', () => {
     expect(mockUpdate).toHaveBeenCalledTimes(2);
   });
 
-  it('skips unchanged and missing items without writing', async () => {
+  it('skips unchanged items and fails missing items without writing', async () => {
     mockFindUnique
       .mockResolvedValueOnce({ id: 'item-1', stock: 5, swis_listed: true })
       .mockResolvedValueOnce(null);
@@ -64,7 +64,8 @@ describe('reconcileStock', () => {
       { inventoryItemId: 'item-2', newStock: 9, source: 'clover_poll' },
     ]);
     expect(res.updated).toBe(0);
-    expect(res.skipped).toBe(2);
+    expect(res.skipped).toBe(1);
+    expect(res.failed).toBe(1);
     expect(res.swisDirty).toEqual([]);
     expect(mockUpdate).not.toHaveBeenCalled();
   });
