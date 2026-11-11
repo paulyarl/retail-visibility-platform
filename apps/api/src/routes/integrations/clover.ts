@@ -1927,6 +1927,17 @@ router.post('/:tenantId/clover/sync', authenticateToken, checkTenantAccess, requ
     let conflictsCreated = 0;
     let itemsArchived = 0;
     const itemErrorDetails: string[] = [];
+    // Same audit-trail vocabulary the History tab renders for demo syncs —
+    // production writes it too now.
+    const auditTrail: Array<Record<string, unknown>> = [];
+    const fmtMoney = (cents: unknown) => (typeof cents === 'number' ? `$${(cents / 100).toFixed(2)}` : String(cents ?? '—'));
+    const pushDiff = (entry: { itemId?: string | null; itemName: string; sku?: string; field: string; oldValue: unknown; newValue: unknown; action: string }) => {
+      auditTrail.push({
+        ...entry,
+        formattedOld: entry.field === 'price' || entry.field === 'sale_price' ? fmtMoney(entry.oldValue) : String(entry.oldValue ?? '—'),
+        formattedNew: entry.field === 'price' || entry.field === 'sale_price' ? fmtMoney(entry.newValue) : String(entry.newValue ?? '—'),
+      });
+    };
 
     // ========================================
     // STEP 1: Sync Categories (Clover → VisibleShelf)
@@ -2067,6 +2078,10 @@ router.post('/:tenantId/clover/sync', authenticateToken, checkTenantAccess, requ
         if (itemMapping && itemMapping.rvp_item_id) {
           // Item already mapped - update if requested
           if (updateExisting) {
+            const current = await prisma.inventory_items.findUnique({
+              where: { id: itemMapping.rvp_item_id },
+              select: { name: true, price_cents: true, sale_price_cents: true, stock: true, directory_category_id: true }
+            });
             await prisma.inventory_items.update({
               where: { id: itemMapping.rvp_item_id },
               data: {
@@ -2078,6 +2093,18 @@ router.post('/:tenantId/clover/sync', authenticateToken, checkTenantAccess, requ
                 updated_at: new Date()
               }
             });
+            if (current) {
+              if (current.name !== cloverItem.name)
+                pushDiff({ itemId: itemMapping.rvp_item_id, itemName: cloverItem.name, sku: cloverItem.sku, field: 'name', oldValue: current.name, newValue: cloverItem.name, action: 'updated' });
+              if (current.price_cents !== cloverItem.price)
+                pushDiff({ itemId: itemMapping.rvp_item_id, itemName: cloverItem.name, sku: cloverItem.sku, field: 'price', oldValue: current.price_cents, newValue: cloverItem.price, action: 'updated' });
+              if (current.sale_price_cents !== (cloverItem.salePrice || null))
+                pushDiff({ itemId: itemMapping.rvp_item_id, itemName: cloverItem.name, sku: cloverItem.sku, field: 'sale_price', oldValue: current.sale_price_cents, newValue: cloverItem.salePrice || null, action: 'updated' });
+              if ((current.stock ?? 0) !== cloverItem.stockCount)
+                pushDiff({ itemId: itemMapping.rvp_item_id, itemName: cloverItem.name, sku: cloverItem.sku, field: 'stock', oldValue: current.stock ?? 0, newValue: cloverItem.stockCount, action: 'updated' });
+              if (current.directory_category_id !== rvpCategoryId)
+                pushDiff({ itemId: itemMapping.rvp_item_id, itemName: cloverItem.name, sku: cloverItem.sku, field: 'category', oldValue: current.directory_category_id, newValue: rvpCategoryId, action: 'updated' });
+            }
             
             await prisma.clover_item_mappings_list.update({
               where: { id: itemMapping.id },
@@ -2124,6 +2151,15 @@ router.post('/:tenantId/clover/sync', authenticateToken, checkTenantAccess, requ
               }
             });
             conflictsCreated++;
+            pushDiff({
+              itemId: skuOwner.id,
+              itemName: cloverItem.name,
+              sku: cloverItem.sku,
+              field: 'sku',
+              oldValue: 'existing item',
+              newValue: `Clover: ${cloverItem.name}`,
+              action: 'conflict'
+            });
             continue;
           }
 
@@ -2184,6 +2220,15 @@ router.post('/:tenantId/clover/sync', authenticateToken, checkTenantAccess, requ
           }
           
           itemsCreated++;
+          pushDiff({
+            itemId: newItem.id,
+            itemName: cloverItem.name,
+            sku: cloverItem.sku,
+            field: 'item',
+            oldValue: null,
+            newValue: cloverItem.name,
+            action: 'created'
+          });
           console.log(`[Clover Sync] Created item: ${cloverItem.name}`);
         }
       } catch (itemError) {
@@ -2214,6 +2259,10 @@ router.post('/:tenantId/clover/sync', authenticateToken, checkTenantAccess, requ
         select: { id: true, rvp_item_id: true }
       });
       for (const stale of staleMappings) {
+        const staleItem = await prisma.inventory_items.findUnique({
+          where: { id: stale.rvp_item_id! },
+          select: { name: true, sku: true }
+        });
         await prisma.inventory_items.update({
           where: { id: stale.rvp_item_id! },
           data: { item_status: 'archived', updated_at: new Date() }
@@ -2223,6 +2272,15 @@ router.post('/:tenantId/clover/sync', authenticateToken, checkTenantAccess, requ
           data: { last_sync_status: 'archived', updated_at: new Date() }
         });
         itemsArchived++;
+        pushDiff({
+          itemId: stale.rvp_item_id,
+          itemName: staleItem?.name || 'Item',
+          sku: staleItem?.sku || '',
+          field: 'status',
+          oldValue: 'active',
+          newValue: 'archived (deleted in Clover)',
+          action: 'archived'
+        });
       }
     }
 
@@ -2235,7 +2293,10 @@ router.post('/:tenantId/clover/sync', authenticateToken, checkTenantAccess, requ
         items_processed: cloverData.items.length,
         items_succeeded: itemsCreated + itemsUpdated,
         items_failed: itemsFailed,
-        error_details: itemErrorDetails.length ? { itemErrors: itemErrorDetails.slice(0, 20) } : undefined,
+        error_details: {
+          ...(itemErrorDetails.length ? { itemErrors: itemErrorDetails.slice(0, 20) } : {}),
+          ...(auditTrail.length ? { auditTrail: auditTrail.slice(0, 100) } : {}),
+        } as any,
         completed_at: new Date(),
         duration_ms: duration
       }

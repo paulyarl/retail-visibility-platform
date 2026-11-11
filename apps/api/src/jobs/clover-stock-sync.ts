@@ -305,6 +305,43 @@ export async function syncIntegration(integration: {
     details.updated = reconciled.updated;
     details.unchanged = reconciled.skipped;
 
+    // ---- Audit trail: the demo's diff vocabulary, produced by live sync ---
+    // Same row shape the History tab renders: action/itemName/sku/field/
+    // formattedOld → formattedNew.
+    const fmtMoney = (cents: unknown) => (typeof cents === 'number' ? `$${(cents / 100).toFixed(2)}` : String(cents ?? '—'));
+    const fmtField = (field: string, v: unknown) =>
+      field === 'price' || field === 'sale_price' ? fmtMoney(v) : String(v ?? '—');
+    const auditTrail: Array<Record<string, unknown>> = reconciled.changes.map((c) => ({
+      itemId: c.itemId,
+      itemName: c.itemName,
+      sku: c.sku,
+      field: c.field,
+      oldValue: c.oldValue,
+      newValue: c.newValue,
+      action: 'updated',
+      formattedOld: fmtField(c.field, c.oldValue),
+      formattedNew: fmtField(c.field, c.newValue),
+    }));
+
+    // Category diffs carry directory ids — resolve display names in one query.
+    const changedCatIds = [...new Set(
+      reconciled.changes.filter((c) => c.field === 'category')
+        .flatMap((c) => [c.oldValue, c.newValue])
+        .filter((v): v is string => typeof v === 'string'),
+    )];
+    if (changedCatIds.length > 0) {
+      const cats = await prisma.directory_category.findMany({
+        where: { id: { in: changedCatIds } },
+        select: { id: true, name: true },
+      });
+      const nameById = new Map(cats.map((c) => [c.id, c.name]));
+      for (const entry of auditTrail) {
+        if (entry.field !== 'category') continue;
+        entry.formattedOld = nameById.get(entry.oldValue as string) ?? '—';
+        entry.formattedNew = nameById.get(entry.newValue as string) ?? '—';
+      }
+    }
+
     // ---- New items: create, or flag a SKU collision as conflict ----------
     let itemsCreated = 0;
     let conflictsCreated = 0;
@@ -334,6 +371,17 @@ export async function syncIntegration(integration: {
           } as any,
         });
         conflictsCreated++;
+        auditTrail.push({
+          itemId: skuOwner.id,
+          itemName: ci.name,
+          sku: ci.sku,
+          field: 'sku',
+          oldValue: 'existing item',
+          newValue: `Clover: ${ci.name}`,
+          action: 'conflict',
+          formattedOld: 'Existing item',
+          formattedNew: `Clover: ${ci.name}`,
+        });
         continue;
       }
       const newItem = await prisma.inventory_items.create({
@@ -373,6 +421,17 @@ export async function syncIntegration(integration: {
       });
       itemsCreated++;
       itemsSucceeded++;
+      auditTrail.push({
+        itemId: newItem.id,
+        itemName: ci.name,
+        sku: ci.sku,
+        field: 'item',
+        oldValue: null,
+        newValue: ci.name,
+        action: 'created',
+        formattedOld: '—',
+        formattedNew: ci.name,
+      });
     }
     details.created = itemsCreated;
     details.conflicts = conflictsCreated;
@@ -385,6 +444,10 @@ export async function syncIntegration(integration: {
       // Only Clover-managed items archive — a 'conflict' mapping points at a
       // merchant-owned item that must outlive a Clover-side delete.
       if (m.mapping_status !== 'mapped' || !m.rvp_item_id || cloverItemById.has(m.clover_item_id)) continue;
+      const archivedItem = await prisma.inventory_items.findUnique({
+        where: { id: m.rvp_item_id },
+        select: { name: true, sku: true },
+      });
       await prisma.inventory_items.update({
         where: { id: m.rvp_item_id },
         data: { item_status: 'archived', updated_at: new Date() },
@@ -394,6 +457,17 @@ export async function syncIntegration(integration: {
         data: { last_sync_status: 'archived', updated_at: new Date() },
       });
       itemsArchived++;
+      auditTrail.push({
+        itemId: m.rvp_item_id,
+        itemName: archivedItem?.name || 'Item',
+        sku: archivedItem?.sku || '',
+        field: 'status',
+        oldValue: 'active',
+        newValue: 'archived',
+        action: 'archived',
+        formattedOld: 'Active',
+        formattedNew: 'Archived (deleted in Clover)',
+      });
     }
     details.archived = itemsArchived;
     details.categoriesCreated = categoriesCreated;
@@ -402,6 +476,13 @@ export async function syncIntegration(integration: {
     const pushed = await posStockSyncService.swisPushForDirty(tenantId, reconciled.swisDirty);
     details.swisPushed = pushed.pushed;
     details.swisSkipped = pushed.skipped;
+    // Cap the trail — a first-run baseline on a big merchant could emit
+    // thousands of created rows; keep the log row bounded, head + tail kept.
+    if (auditTrail.length > 100) {
+      (details as any).auditTrailTruncated = auditTrail.length - 100;
+      auditTrail.splice(50, auditTrail.length - 100);
+    }
+    (details as any).auditTrail = auditTrail;
     if (pushed.errors.length > 0) {
       errorMessage = `swis push errors: ${pushed.errors
         .slice(0, 3)
