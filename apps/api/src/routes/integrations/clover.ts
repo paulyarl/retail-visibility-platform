@@ -1987,6 +1987,7 @@ router.post('/:tenantId/clover/sync', authenticateToken, checkTenantAccess, requ
               price: (cloverItem.price || 0) / 100,
               sale_price_cents: cloverItem.salePrice || null,
               stock: cloverItem.stockCount,
+              source: 'API_IMPORT',
               directory_category_id: rvpCategoryId,
               item_status: 'active',
               visibility: 'public',
@@ -2194,10 +2195,24 @@ router.get('/:tenantId/clover/mappings', authenticateToken, checkTenantAccess, a
       rvpItem: mapping.rvp_item_id ? rvpItemMap.get(mapping.rvp_item_id) : null
     }));
 
+    // Platform-only items: tenant inventory with no POS mapping. These are
+    // managed on VisibleShelf only — sellable beyond the cash register.
+    const platformOnlyItems = await prisma.inventory_items.findMany({
+      where: {
+        tenant_id: tenantId,
+        item_status: { in: ['active', 'inactive'] },
+        ...(rvpItemIds.length > 0 ? { id: { notIn: rvpItemIds } } : {})
+      },
+      select: { id: true, name: true, sku: true, price_cents: true, stock: true, source: true, item_status: true },
+      orderBy: { name: 'asc' }
+    });
+
     return res.json({
       mappings: mappingsWithItems,
       total: mappings.length,
-      conflicts: mappings.filter(m => m.mapping_status === 'conflict').length
+      conflicts: mappings.filter(m => m.mapping_status === 'conflict').length,
+      platformOnly: platformOnlyItems,
+      platformOnlyTotal: platformOnlyItems.length
     });
 
   } catch (error: any) {
