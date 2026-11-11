@@ -1,9 +1,30 @@
 # Clover App Market Listing — Spec for Team Review
 
-Status: **v7 DRAFT** · decisions settled 2026-11-11 · Pointy pattern applied · platform control as the headline benefit
+Status: **v8** · engineering pass landed 2026-11-11 · most §7 blockers shipped — see per-item status markers
 Scope: polish + submission of the VISIBLE SHELF connector listing on the Clover App Market (web/REST app — no APK, no device targets).
 
 ## 0. Changelog
+
+### v7 → v8 — engineering pass landed
+
+The §7 blockers were patched 2026-11-11 (commit on `staging`, migration `378`
+applied to stg+prd, `BATCH_JOBS_ENABLED=false` set on the Railway standby).
+The unbound-install fix shipped as a **generalized onboarding-lane mechanism**,
+not the §7.1 signed-cookie sketch — see the marker on that item.
+
+| Item | State |
+| --- | --- |
+| §7.1 unbound launch | **Shipped (better shape)** — lane-based signup routing, params survive the Auth0 round-trip, post-tenant exit auto-continues OAuth and chains into the Google/GMC connect |
+| §7.2 scopes | **Done** — `merchant_r` + `inventory_r` only; sandbox consent re-verify pending reinstall |
+| §7.3 token refresh | **Done** — Clover sweep in `oauth-token-refresh`, rotates + persists refresh tokens, stamps `token_expired` on failure; sandbox can't exercise it (non-expiring tokens) — prod verify pending |
+| §7.4 disconnect gate | **Done** — tier middleware removed; auth + tenant access kept |
+| §7.5 failure states | **Done** — card renders `token_expired` / `failed` / `module_missing` with actions |
+| §7.7 launch identity | **Done (partial)** — `client_id` validated; route stays public by design |
+| §7.11 trial grant | **Done (superseded)** — `integration_clover` granted on **all three triad tiers** (presence/discovery/storefront), not a single trial grant; `FEATURE_TIER_MAP` → `discovery` in both canonical copies; fixture witness re-synced, contract suite green |
+| §7.13 module probe | **Done** — `item_stocks?limit=1` probe at callback; 403/404 → `module_missing` state + merchant-readable error |
+| §7.14 duplicate tenant | **Partial** — onboarding already 409s a second trial tenant; explicit `merchant_id` rebind guard still open |
+| §7.10 funnel metrics | **Partial** — `lane` id in phase-1 state gives channel attribution for free; no counters yet |
+| §7.6 / §7.8 / §7.9 / §7.12 / §7.15 | **Open** — unchanged |
 
 ### v6 → v7 — platform control promoted to the headline benefit
 
@@ -339,6 +360,76 @@ but it leads through the hero line, not the benefit list.
 
 The 11-photo figure is already true in code (§7.17), so it ships as written.
 
+### 3.9 Paste-ready field block (v8 — FREE listing + disclosed platform tiers)
+
+Pricing shape resolved for the listing fields below: **Clover-side FREE**
+("This app will not be billed to your account") with platform tiers disclosed
+in the description — one billing source of truth, honest FREE badge (§6.7
+Option B is the pending decision that would change the "Pricing" paragraph;
+if Clover-billed plans are chosen instead, replace that paragraph with the
+plan table).
+
+**App name** (≤126 chars):
+```
+VisibleShelf — Clover Inventory to Google Search & Maps
+```
+
+**Tagline** (≤255 chars):
+```
+Your register knows what you stock. VisibleShelf makes it findable — on Google Maps, with a catalog that stays yours.
+```
+
+**Short description:**
+```
+Help shoppers find what you stock before they visit. VisibleShelf connects your Clover register to Google Maps — every item, not just the barcoded ones, and each one described the way you want it described. Barcode-matching tools publish a manufacturer's record and leave you no say in it. VisibleShelf makes your product record the source of truth: your name for it, your own ID, your photos, your categories — including products no barcode database has ever heard of.
+```
+
+**Merchant benefits** (each ≤100 chars, verified):
+```
+Your catalog, your control — your names, photos and descriptions, not a manufacturer's record
+List every item, barcoded or not — house brands and specialty goods included
+Up to 11 photos per product on Google — your packaging, not a stock image
+Sell beyond the register — special orders and services list alongside POS items
+Found before they visit — stock and price flow from Clover automatically
+```
+
+**Description** (long — §3 long description plus the Pricing paragraph. Field-safe variant:
+Clover's Description field strips newlines and HTML-escapes ASCII apostrophes into
+`&#39;`, so headers carry em-dash separators and the text avoids apostrophes
+entirely, and the field truncates past ~2.5-3K chars so this compressed
+variant (≈1.8K, PRICING placed early enough to survive truncation) is what to
+paste — exactly this):
+```
+WHAT IT DOES — VisibleShelf connects your Clover register to Google Maps, Google Search, and your own online storefront. Stock and prices stay current automatically, so shoppers nearby see your real shelf.
+
+WHY IT EXISTS — Clover items carry no photos, and the Google inventory app only surfaces products with manufacturer barcodes. House brands, bulk goods, anything without a UPC — they never appear. When a barcode does match, the published record belongs to the manufacturer: their name, their image, their description.
+
+YOUR RECORD — Your product record is the source of truth: your names, your IDs, your photos, your categories. Products you create on VisibleShelf are yours outright — no Clover sync can overwrite them — and on synced items your photos and descriptions are never touched. Stock, price, and item name come from Clover; how the product looks and reads is yours.
+
+UP TO 11 PHOTOS PER PRODUCT — Your packaging, your angles — not a stock image. One primary photo plus up to ten more per product publish to Google alongside your description and categories.
+
+NO MANUAL ENTRY — Names, prices, and stock come straight from Clover. You never type anything to get listed.
+
+BEYOND THE REGISTER — Platform-only items — special orders, services, not-yet-keyed products — list right alongside POS inventory.
+
+PRICING — Connecting Clover and syncing inventory is free. Presentation features — photos, descriptions, platform-only items, storefront publishing — are part of VisibleShelf plans with a free trial; see visibleshelf.com for current plans. Cancel any time; disconnecting removes your access tokens.
+
+WHAT YOU NEED — A Clover account with the Inventory module and a verified Google Business Profile.
+
+HOW IT WORKS — Connect, automatic sync every 15 minutes, live. We never write back to your register.
+```
+
+**Legal & Privacy:**
+- Privacy policy URL: `https://visibleshelf.com/privacy`
+- Terms URL: `https://visibleshelf.com/terms`
+
+**Developer Support:**
+- Email: `support@visibleshelf.com`
+
+**Pricing & Subscription Information:** keep the single FREE plan — no
+Clover-billed subscription tiers (platform tiers disclosed in the description
+instead; revisit if §6.7 resolves to Clover-side billing).
+
 ## 4. Media assets — spec
 
 | Asset | Requirement | Proposed |
@@ -366,13 +457,13 @@ it is the thing Pointy cannot do for a non-barcoded item.
 
 | Requirement | State |
 | --- | --- |
-| Privacy policy URL | Exists — `visibleshelf.com/privacy` (incl. `/privacy/ccpa`). **Gap:** names Clover and the service-provider role, but no token storage / retention / deletion-on-disconnect statement. Add a retention clause (§9.2). |
-| Terms / EULA URL | Exists — `visibleshelf.com/terms`, `visibleshelf.com/legal`. Confirm coverage of Clover's Developer Legal Guidelines. |
+| Privacy policy URL | **Done** — `visibleshelf.com/privacy` (incl. `/privacy/ccpa`) updated Nov 2026: POS/integration data + encrypted OAuth tokens disclosed in §1; disconnect/uninstall deletes credentials + stops syncing in §5; disconnect listed in §6 choices. |
+| Terms / EULA URL | **Done** — `visibleshelf.com/terms` updated Nov 2026: §5 covers integration authority, consent-screen permissions (Clover read-only, no write-back), and disconnect/uninstall stopping sync + removing stored credentials. |
 | Support contact | **Settled: `support@visibleshelf.com`.** Same inbox as lead intake (`EMAIL_SUPPORT`). Confirm monitoring SLA. |
-| Permissions justification | Target: Inventory **Read** + Merchant **Read**. **Current code requests `inventory_w`** — §7.2. Do not submit until reduced. |
-| Launch path | **Partial** — route exists, unbound branch 404s, OAuth does not auto-continue. Rewritten per 6.5 in §7.1. |
+| Permissions justification | **Done** — code requests Inventory **Read** + Merchant **Read** only (§7.2). Re-verify the consent screen on next reinstall. |
+| Launch path | **Done** — bound merchants route to their tenant; unbound route into the `clover_market` signup lane → tenant creation → auto-OAuth → GMC chain (§7.1). `client_id` validated. |
 | Reviewer enablement | **Missing** — test-merchant credentials, "how to test" steps, demo video. |
-| App name | **Settled: `VisibleShelf — Local Inventory Sync`** (35 chars — verify limit; fallback `VisibleShelf: Inventory Sync`). |
+| App name | **Settled (v8): `VisibleShelf — Clover Inventory to Google Search & Maps`** (55 chars — Clover dashboard confirmed the field allows 126). Supersedes `VisibleShelf — Local Inventory Sync`; names the source→destination surface instead of the generic pipe. |
 | Categories | **Settled:** Inventory Management (functional), Retail (vertical). |
 
 ## 6. Configuration decisions
@@ -384,7 +475,7 @@ it is the thing Pointy cannot do for a non-barcoded item.
 | 6.1 | Pricing model | Free listing + 30-day trial auto-granted on install *(trial mechanism under review — §6.7)* |
 | 6.2 | Merchant availability | All Clover plans |
 | 6.3 | Categories / positioning | Inventory Management + Retail; product visibility connector |
-| 6.4 | App name | `VisibleShelf — Local Inventory Sync` |
+| 6.4 | App name | `VisibleShelf — Clover Inventory to Google Search & Maps` (v8 — SWIS destination named; "See What's In Store" stays out of the title to avoid implied-endorsement flags) |
 | 6.5 | Fresh-install destination | New-tenant registration flow → integration-capability-aware tier |
 
 ### 6.6 REOPENED — trial expiry
@@ -437,12 +528,25 @@ pattern.
 verification notes — they constrain what the listing may claim, not whether it can
 be filed.
 
-**7.1 Launch path does not survive a fresh install.**
-`GET /clover/launch` resolves the tenant from `merchant_id`. If the merchant isn't
-in `clover_integrations_list` — every genuine first install — it redirects to
-`${webUrl}/settings/integrations?clover=installed`, a route that **does not exist**
-(only `/t/[tenantId]/settings/integrations` exists; no `next.config` redirect).
-`clover=installed` is read by nothing in `apps/web`.
+**7.1 Launch path does not survive a fresh install. — SHIPPED (better shape)**
+*Shipped 2026-11-11 as the generalized **onboarding-lane** mechanism rather than
+the signed-cookie sketch below:* the launch route resolves bound merchants to
+their tenant; unbound installs redirect to
+`/auth/signup/wizard?lane=clover_market&merchant_id=…`. The lane
+(`apps/web/src/lib/onboarding/lanes.ts`) declares the preselected tier
+(`discovery`) and the post-tenant exit; it persists through the Auth0 round-trip
+in `onboardingStateService` phase-1. After tenant creation every onboarding exit
+routes to `/t/{id}/settings/integrations?clover=installed` → auto-OAuth → on
+success, if GMC is unavailable, `?from=clover` auto-continues into the Google
+connect — the lane's real completion state. The `/signup` and `/auth/signup`
+redirect stubs were also fixed to forward query params. Remaining delta vs. the
+original design: `merchant_id` rides as an advisory param (no signed cookie) —
+binding still happens at the OAuth callback — and the explicit
+already-bound-rebind guard is §7.14.
+
+*Original problem statement (for the record):*
+`GET /clover/launch` resolved the tenant from `merchant_id`; unbound merchants
+hit a nonexistent `/settings/integrations` route.
 *Fix (per 6.5):*
 1. Unbound launch → public `/clover/install?merchant_id=…`, stashing `merchant_id`
    in a **signed** cookie (24h — must survive onboarding), then Auth0 universal
@@ -453,30 +557,40 @@ in `clover_integrations_list` — every genuine first install — it redirects t
    binds `merchant_id`, continues OAuth.
 4. Never create a tenant for a user who already has one (§7.14).
 
-**7.2 Over-scoped permissions.** `REQUIRED_SCOPES` requests `inventory_w` while §5
-and the copy promise read-only. Clover review compares declared scopes to observed
-behaviour.
-*Fix:* reduce to `inventory_r` + `merchant_r`; re-verify the sandbox grant and the
-full stock sync with read-only scopes.
+**7.2 Over-scoped permissions. — DONE**
+`REQUIRED_SCOPES` is now `merchant_r` + `inventory_r` only
+(`apps/api/src/services/clover-oauth.ts`); `formatScopesForDisplay` no longer
+advertises write. Remaining: re-verify the sandbox consent screen + full stock
+sync on the next reinstall, since the granted permission lives on the install.
 
-**7.3 No Clover token refresh.** `oauth-token-refresh.ts` has no Clover branch. On a
-401 the stock-sync job stamps `last_sync_status='token_expired'` but never changes
-`status` and never notifies anyone.
-*Fix:* add the branch; persist the **rotated** refresh token; decide whether an
-expired token pauses the integration or keeps serving stale stock; surface the
-state (§7.5).
+**7.3 No Clover token refresh. — DONE**
+`oauth-token-refresh` now sweeps `clover_integrations_list` for rows with a
+`refresh_token` expiring inside the threshold, refreshes via
+`refreshAccessToken`, **persists the rotated refresh token** when Clover returns
+one, and updates `token_expires_at`. Runs unconditionally (not gated on
+`oauth_tokens` rows). Refresh failure stamps `last_sync_status='token_expired'`,
+which the card renders with a Reconnect action (§7.5). Sandbox can't exercise it
+(non-expiring tokens) — verify on the first prod integration.
 
-**7.4 No revocation path.** `POST /:tenantId/clover/disconnect` is gated on
-`requireTierFeature('integration_clover')`. With the uninstall webhook unwired, a
-downgraded or uninstalled merchant's token can never be cleared.
-*Fix:* ungate disconnect; wire the uninstall webhook or add an auto-disconnect
-sweep. Load-bearing for any expiry design (§6.6) and for §9.2.
+**7.4 No revocation path. — DONE**
+`requireTierFeature('integration_clover')` removed from
+`POST /:tenantId/clover/disconnect`; `authenticateToken` + `checkTenantAccess`
+remain, so a lapsed tier can never trap a merchant's tokens. The uninstall
+webhook also landed ahead of schedule: `/api/webhooks/clover` now handles `A:`
+app events — `UNINSTALL`/`DELETE` disconnects the integration (clears tokens,
+`status='disconnected'`, `last_sync_status='uninstalled'`) and logs every app
+event for payload-shape observability. `CLOVER_WEBHOOK_SECRET` is set on prod
+and the App subscription is enabled in the dashboard; verify on the next
+uninstall.
 
-**7.5 Failure is invisible.** `CloverConnectionCard` renders Connected from
-`isEnabled && mode === 'production'` and shows only a last-sync *date*, never
-`last_sync_status`.
-*Fix:* render `token_expired` / `failed` / `trial_ended` / `cap_reached` states with
-a reconnect or upgrade action.
+**7.5 Failure is invisible. — DONE**
+`CloverConnectionCard` takes `lastSyncStatus` and renders three honest states:
+`token_expired` (red banner + Reconnect button), `module_missing` (amber,
+explains the missing Inventory module), `failed` (amber, points at History).
+Wired on both integrations pages; `CloverIntegrationData` exposes the field;
+`useCloverIntegration` maps `inventory_module_missing` / `oauth_denied` /
+`state_expired` to readable messages. `trial_ended` / `cap_reached` remain
+pending §6.6/§6.7 (§7.12).
 
 **7.6 The environment cutover breaks the sandbox lane.** `cloverApiBaseUrl()` reads
 one process-wide `CLOVER_ENVIRONMENT`, while the OAuth callback writes sandbox
@@ -485,10 +599,13 @@ sandbox integration at `api.clover.com` with a sandbox token → 401.
 *Fix:* purge/flag sandbox rows in §8 step 6, or add a per-integration environment
 column.
 
-**7.7 Launch route trusts `merchant_id` alone.** No `client_id` validation and no
-membership check: a merchant bound to tenant A, launched by tenant B's user, is
-routed to tenant A's settings page.
-*Fix:* validate `client_id`; gate the redirect on a session for that tenant.
+**7.7 Launch route trusts `merchant_id` alone. — DONE (partial)**
+`client_id` is now validated against the configured Clover client ID — a
+mismatch redirects to signup with no tenant routing. The route stays public by
+design (Clover launches are unauthenticated); `merchant_id` only resolves bound
+integration rows, and the destination is always the merchant's *own* tenant —
+so a foreign launch can't route into the wrong tenant. The residual
+`merchant_id`-rebind concern is tracked in §7.14.
 
 **7.8 Schema assumptions.** Every lookup is `findFirst` on `tenant_id` or
 `merchant_id`; no unique constraint on `merchant_id`; no migration files for the
@@ -498,13 +615,27 @@ Clover tables at all. One merchant could bind to two tenants.
 **7.9 No rate-limit/backoff design.** The 15-minute poll fans out across all active
 integrations; nothing handles Clover 429s or per-merchant backoff.
 
-**7.10 No funnel instrumentation.** Install → launch → registration → OAuth →
-first sync has no counters. With a free-tier model (§6.7), connect-completion and
-free→paid conversion are the metrics that decide the channel.
+**7.10 No funnel instrumentation. — PARTIAL**
+The lane mechanism made the funnel *addressable* for free: `lane.id` rides in
+phase-1 onboarding state (e.g. `clover_market`), so channel attribution exists
+at the data layer and each transition point (launch → wizard mount →
+`completePhase1` → lane exit → OAuth callback) has a natural emit site.
+Counters themselves are still open.
 
-**7.11 Trial grant must be integration-capability-aware — and cannot be `starter`.**
-A Clover-sourced tenant must land on a tier that includes `integration_clover` from
-the first screen. **The v3 assumption that this means a "Starter trial" is wrong:**
+**7.11 Trial grant must be integration-capability-aware — DONE (superseded).**
+*Superseded by a better shape:* instead of a single trial grant,
+`integration_clover` is now enabled on **all three Entry-Presence triad tiers**
+(`presence`, `discovery`, `storefront`) via migration
+`database/migrations/378_clover_triad_grant.sql` (applied stg+prd). Trial keys
+proxy to base tiers at check time (`TierService.checkTierFeatureAccess`), so
+every triad trial carries it — onboarding already mints `trial_discovery` by
+default, which is what the Clover lane lands on. `FEATURE_TIER_MAP` →
+`discovery` in both canonical copies (`apps/api/src/middleware/tier-access.ts`,
+`apps/web/src/lib/tiers/tier-features.ts`); `starter` keeps its legacy grant
+(grandfathered). DB witness re-dumped, `capability_modules` synced, tier
+contract suite green.
+
+*Original analysis (still accurate):*
 
 - `starter` is marked **inactive_legacy** in `shared/tier-contract.json` (see the
   `trial_eligible` note), so a new tenant can't be assigned it in practice.
@@ -535,16 +666,22 @@ If §6.7 option B is chosen instead: the cap must be enforced at sync time (sync
 first N items, mark the rest `cap_reached`) and surfaced as an upgrade prompt, not
 as a silent partial catalog.
 
-**7.13 Inventory-module detection (mandatory because of 6.2).** With the listing
-visible on all plans, merchants without the Inventory module will install. Probe at
-connect (`GET /v3/merchants/{mid}/items?limit=1`; treat 403/404 as module-absent)
-and render an explicit state — never an empty sync that looks like a bug. Also
-stated in the listing copy (§3).
+**7.13 Inventory-module detection (mandatory because of 6.2). — DONE**
+The OAuth callback probes `GET /v3/merchants/{mid}/item_stocks?limit=1` with the
+fresh token; `403`/`404` stamps `last_sync_status='module_missing'` and
+redirects with `error=inventory_module_missing` instead of a hollow
+`success=connected`. The card renders the state and the hook maps the error to
+a merchant-readable message. Probe failure is non-fatal — only a definitive
+403/404 blocks the connect.
 
-**7.14 Duplicate-tenant guard (from 6.5).** Registration must not let an existing
-merchant create a second tenant by installing from Clover, and must not rebind a
-`merchant_id` already bound to tenant A onto tenant B. Refuse explicitly — this is
-the hijack vector in 7.7.
+**7.14 Duplicate-tenant guard (from 6.5). — PARTIAL**
+The onboarding route already refuses a second trial tenant
+(`trial_limit_reached` 409), and the wizard's existing-user path routes to their
+own tenant's integrations page rather than creating anything. **Still open:**
+an explicit refuse when `merchant_id` is already bound to a *different* tenant —
+today the callback would write the merchant onto whichever tenant completes
+OAuth. Enforce at callback: if `merchant_id` is bound to tenant A and the OAuth
+state resolves tenant B, refuse with a merchant-readable error.
 
 **7.15 "No manual entry" must be true (new, Pointy pattern).** The listing will
 claim products go live from Clover data alone. Verify a fresh connect produces
@@ -598,13 +735,13 @@ to them, or the claim becomes tier-dependent.
 ## 8. Submission sequence (order matters)
 
 1. ✅ Legal pages cover the connector's data handling — **partially**; add the retention clause (§9.2)
-2. Resolve §6.6/§6.7 pricing shape, then §7.1 registration flow + §7.2 scopes
-3. Land §7.11 trial grant (`trial_discovery`) + §7.12 cap/expiry + §7.13 module detection
+2. ✅ ~~§7.1 registration flow + §7.2 scopes~~ — **done** (lane routing + read-only scopes); still open: resolve §6.6/§6.7 pricing shape
+3. ~~§7.11 trial grant + §7.13 module detection~~ — **done** (triad grant + connect probe); still open: §7.12 cap/expiry once §6.6/§6.7 resolves
 4. Produce icon + screenshots (after §7.6 cleanup), including the no-photo item shot
 5. Polish listing fields on the **sandbox** app first (copy is reusable)
 6. File **production developer account** (approval lead time — the long pole; start early)
 7. Re-create app in the **production** dashboard → §8.2 cutover checklist
-8. Land §7.3 refresh + §7.4 revocation + §7.5 failure states
+8. ✅ ~~§7.3 refresh + §7.4 revocation + §7.5 failure states~~ — **done**
 9. Prod test-merchant install (fresh merchant, not a pre-bound one) → submit listing
 10. **Pitch Clover for an App Market Spotlight** and POS-partner co-marketing — Pointy's distribution came from there, not from the listing alone
 11. Approval review → published listing
@@ -619,7 +756,7 @@ to them, or the claim becomes tier-dependent.
 - [ ] Webhook URL + `CLOVER_WEBHOOK_SECRET` (per-app, not per-account)
 - [ ] App Market visibility = all plans (§6.2), categories, name, support email, pricing badge
 - [ ] Purge or flag sandbox `clover_integrations_list` rows (§7.6)
-- [ ] `BATCH_JOBS_ENABLED=false` on the Railway standby before sign-off
+- [x] `BATCH_JOBS_ENABLED=false` on the Railway standby — **set on `visible-shelf-api-prod` 2026-11-11**
 - [ ] Confirm `scheduled_jobs` / `scheduled_job_runs` exist on prod so the cross-instance lease holds
 - [ ] Rotate `CLOVER_TOKEN_ENCRYPTION_KEY` before external merchants join
 
@@ -627,7 +764,7 @@ to them, or the claim becomes tier-dependent.
 
 ### 9.1 Disclose in review
 
-- App-uninstall webhook not wired (§7.4) — pair with the interim sweep so the statement is "delayed cleanup", not "no cleanup".
+- ~~App-uninstall webhook not wired~~ — **wired** (§7.4): `A:` events disconnect + clear tokens. Live-verify on next uninstall; if Clover's event type differs from UNINSTALL/DELETE, the logged payload will show it.
 - One merchant per tenant (§7.8) — state as a scope limit.
 
 ### 9.2 Retention & revocation
@@ -637,11 +774,39 @@ listing answers it in one sentence: on cancel, *"the Merchant's Pointy account w
 be deleted and all products will be removed."* Ours must be as concrete:
 
 - Tokens encrypted at rest with `CLOVER_TOKEN_ENCRYPTION_KEY`; never logged.
-- **On cancel, uninstall, or expiry:** tokens cleared immediately; the merchant's
-  catalog removed from Google surfaces within one sync cycle.
+- **On cancel, uninstall, or expiry:** tokens cleared immediately (manual
+  disconnect + the uninstall webhook now both clear credentials).
+- Google-surface removal: the privacy policy states the honest behavior —
+  published catalog **stops updating** and is removed per Google's own
+  processes. ⚠️ Do NOT promise "removed within one sync cycle" anywhere — no
+  GMC deletion sweep exists in code. If reviewers push on it, the sweep is a
+  real feature build; until then "stops updating" is the true claim.
 - Synced inventory retained as merchant data (merchant-owned) and deleted on
   account deletion.
 - Retention window for sync logs and the dirty-item queue: state a number.
+
+### 9.3 Commerce lane — deferred scopes (v2 direction)
+
+The platform is payment-aware (deposit checkout on `presence`, `orders` /
+`payments` models, tenant commerce settings), so Clover's Orders / Payments /
+Ecommerce scopes are a *sequenced expansion*, not a rejected one. The v1
+submission deliberately requests only Inventory Read + Merchant Read:
+
+- every requested scope is a review-justification burden — "what does the app
+  do with Payments write?" has no honest answer until the feature exists
+- "we never write back" is a one-line verifiable claim only while scopes are
+  read-only
+- Clover supports expanding requested permissions on app update — merchants
+  re-consent on next install. Growing scopes later is normal; shrinking them
+  after consent is the awkward direction.
+
+**Target shape when the feature lands:** platform checkout → **Clover order
+write** — a `presence`-tier deposit purchase lands in the merchant's Clover
+register, keeping the register authoritative for transactions exactly as it is
+for stock/price/name. A read-only intermediate (Orders read → sell-through
+velocity into the intelligence layer) is also available as a lighter v1.5.
+Webhook subscriptions for Orders/Payments are already configured on the app, so
+the event plumbing is in place when this activates.
 
 ## 10. Acceptance criteria for "listing is polished"
 
@@ -653,15 +818,15 @@ be deleted and all products will be removed."* Ours must be as concrete:
 - [ ] "No manual entry" verified end-to-end (§7.15)
 - [ ] Authority copy scoped correctly: platform products immune to sync, mapped items keep photos/descriptions, name follows Clover (§7.16)
 - [ ] 11-photo push verified on a SWIS-listed item, and not tier-gated (§7.17)
-- [ ] "We never write back" matches the requested scopes (§7.2)
+- [x] "We never write back" matches the requested scopes (§7.2 — code requests read-only)
 - [ ] Privacy/ToS live, including the retention/deletion clause (§9.2)
 - [ ] Support contact populated (`support@visibleshelf.com`) and monitored
-- [ ] Permissions = Inventory R + Merchant R — verified against `REQUIRED_SCOPES` in code
+- [x] Permissions = Inventory R + Merchant R — verified against `REQUIRED_SCOPES` in code
 - [ ] App name + categories live; name length within Clover's limit
 - [ ] Merchant testimonial sourced (Pointy pattern)
 - [ ] Fresh-install verified from a merchant with **no prior binding**, through registration, landing on `discovery`-equivalent access (§7.1, §7.11)
 - [ ] Existing-merchant install verified: no duplicate tenant, binds to existing (§7.14)
-- [ ] Merchant without Inventory module gets the explicit state (§7.13)
+- [ ] Merchant without Inventory module gets the explicit state (§7.13 — code landed; verify live)
 - [ ] Token refresh verified by forcing an expired access token (§7.3)
 - [ ] Cap or expiry behaviour verified by forcing the boundary; card shows the state (§7.12)
 - [ ] Disconnect verified on a sub-`discovery` tenant (§7.4)

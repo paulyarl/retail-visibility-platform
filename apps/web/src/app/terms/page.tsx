@@ -31,7 +31,7 @@ export default function TermsPage() {
           <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
             <h1 className="text-4xl font-bold text-neutral-900 mb-4">Terms of Service</h1>
             <p className="text-neutral-600 mb-8 text-sm">
-              Last updated: November 2025
+              Last updated: November 2026
             </p>
 
             <p className="text-neutral-700 mb-6">
@@ -100,6 +100,16 @@ export default function TermsPage() {
               Some features rely on third-party services (such as Google or POS providers), and
               their availability or behavior may change based on those third parties' decisions and
               policies.
+            </p>
+            <p className="text-neutral-700 mb-4">
+              When you connect a third-party account (such as a POS provider or Google), you
+              represent that you have the authority to grant that access, and your use of that
+              provider remains subject to its own terms. The permissions each integration requests
+              are shown on the provider&apos;s consent screen — for Clover, {platformName} requests
+              read-only access to merchant and inventory data and does not write back to your
+              register. Disconnecting an integration or uninstalling our app from a provider&apos;s
+              marketplace stops syncing and removes our stored access credentials for that
+              connection.
             </p>
 
             <h2 className="text-2xl font-semibold text-neutral-900 mt-10 mb-3">6. Disclaimers and Limitation of Liability</h2>

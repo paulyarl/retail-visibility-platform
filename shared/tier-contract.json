@@ -509,7 +509,7 @@
     }
   },
   "capability_modules": {
-    "$comment": "Generated from the DB witness (scripts/sync-fixture-modules.cjs — do NOT hand-edit). Source: shared/tier-contract-db-witness.json (env=unknown, generated_at=2026-10-21T15:47:27.862Z). tier-db-witness.test.ts asserts this block === witness.capability_features.",
+    "$comment": "Generated from the DB witness (scripts/sync-fixture-modules.cjs — do NOT hand-edit). Source: shared/tier-contract-db-witness.json (env=prd, generated_at=2026-11-11T13:02:16.025Z). tier-db-witness.test.ts asserts this block === witness.capability_features.",
     "barcode_scan_options": [
       "barcode_camera",
       "barcode_disabled",

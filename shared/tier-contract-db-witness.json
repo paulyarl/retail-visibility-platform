@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-10-25T12:31:15.559Z",
+  "generated_at": "2026-11-11T13:02:16.025Z",
   "env": "prd",
   "tiers": [
     {
@@ -545,6 +545,14 @@
       },
       {
         "feature_key": "sla_guarantee",
+        "is_enabled": true
+      },
+      {
+        "feature_key": "social_posting_enabled",
+        "is_enabled": true
+      },
+      {
+        "feature_key": "social_posting_flexible",
         "is_enabled": true
       },
       {
@@ -2324,6 +2332,14 @@
       {
         "feature_key": "social_commerce_tiktok_shop",
         "is_enabled": false
+      },
+      {
+        "feature_key": "social_posting_enabled",
+        "is_enabled": true
+      },
+      {
+        "feature_key": "social_posting_flexible",
+        "is_enabled": true
       },
       {
         "feature_key": "square_sync",
@@ -5486,6 +5502,14 @@
         "is_enabled": false
       },
       {
+        "feature_key": "social_posting_enabled",
+        "is_enabled": true
+      },
+      {
+        "feature_key": "social_posting_meta",
+        "is_enabled": true
+      },
+      {
         "feature_key": "square_sync",
         "is_enabled": true
       },
@@ -6786,6 +6810,10 @@
         "is_enabled": false
       },
       {
+        "feature_key": "directory_entry_posts_on",
+        "is_enabled": true
+      },
+      {
         "feature_key": "directory_entry_qr_enabled",
         "is_enabled": false
       },
@@ -6999,6 +7027,10 @@
       },
       {
         "feature_key": "funnel_options_disabled",
+        "is_enabled": true
+      },
+      {
+        "feature_key": "integration_clover",
         "is_enabled": true
       },
       {
@@ -8216,6 +8248,14 @@
         "is_enabled": true
       },
       {
+        "feature_key": "social_posting_enabled",
+        "is_enabled": true
+      },
+      {
+        "feature_key": "social_posting_meta",
+        "is_enabled": true
+      },
+      {
         "feature_key": "storefront",
         "is_enabled": true
       },
@@ -9394,6 +9434,34 @@
         "is_enabled": true
       },
       {
+        "feature_key": "gbp_ai_response",
+        "is_enabled": false
+      },
+      {
+        "feature_key": "gbp_attributes",
+        "is_enabled": false
+      },
+      {
+        "feature_key": "gbp_directory_content",
+        "is_enabled": false
+      },
+      {
+        "feature_key": "gbp_directory_reviews",
+        "is_enabled": false
+      },
+      {
+        "feature_key": "gbp_management_flexible",
+        "is_enabled": true
+      },
+      {
+        "feature_key": "gbp_media_upload",
+        "is_enabled": false
+      },
+      {
+        "feature_key": "gbp_posts_scheduler",
+        "is_enabled": false
+      },
+      {
         "feature_key": "google_sync",
         "is_enabled": true
       },
@@ -9872,6 +9940,14 @@
       {
         "feature_key": "social_commerce_tiktok_shop",
         "is_enabled": false
+      },
+      {
+        "feature_key": "social_posting_enabled",
+        "is_enabled": true
+      },
+      {
+        "feature_key": "social_posting_flexible",
+        "is_enabled": true
       },
       {
         "feature_key": "square_sync",
@@ -11441,6 +11517,14 @@
       },
       {
         "feature_key": "social_commerce_tiktok_shop",
+        "is_enabled": true
+      },
+      {
+        "feature_key": "social_posting_enabled",
+        "is_enabled": true
+      },
+      {
+        "feature_key": "social_posting_meta",
         "is_enabled": true
       },
       {
@@ -13138,6 +13222,14 @@
         "is_enabled": false
       },
       {
+        "feature_key": "social_posting_enabled",
+        "is_enabled": true
+      },
+      {
+        "feature_key": "social_posting_flexible",
+        "is_enabled": true
+      },
+      {
         "feature_key": "square_sync",
         "is_enabled": true
       },
@@ -13652,6 +13744,10 @@
         "is_enabled": true
       },
       {
+        "feature_key": "directory_entry_posts_on",
+        "is_enabled": true
+      },
+      {
         "feature_key": "directory_entry_qr_enabled",
         "is_enabled": true
       },
@@ -13689,6 +13785,10 @@
       },
       {
         "feature_key": "funnel_options_disabled",
+        "is_enabled": true
+      },
+      {
+        "feature_key": "integration_clover",
         "is_enabled": true
       },
       {
@@ -14652,6 +14752,14 @@
       {
         "feature_key": "social_commerce_tiktok_shop",
         "is_enabled": false
+      },
+      {
+        "feature_key": "social_posting_enabled",
+        "is_enabled": true
+      },
+      {
+        "feature_key": "social_posting_flexible",
+        "is_enabled": true
       },
       {
         "feature_key": "storefront",
@@ -15762,6 +15870,10 @@
       {
         "feature_key": "directory_entry_map_on",
         "is_enabled": false
+      },
+      {
+        "feature_key": "directory_entry_posts_on",
+        "is_enabled": true
       },
       {
         "feature_key": "directory_entry_qr_enabled",
@@ -19730,6 +19842,7 @@
       "directory_entry_logo_on",
       "directory_entry_map_enabled",
       "directory_entry_map_on",
+      "directory_entry_posts_on",
       "directory_entry_qr_enabled",
       "directory_entry_qr_on",
       "directory_entry_seo_enabled",
@@ -19850,6 +19963,7 @@
       "gbp_attributes",
       "gbp_directory_content",
       "gbp_directory_reviews",
+      "gbp_managed_service",
       "gbp_management_flexible",
       "gbp_media_upload",
       "gbp_posts_scheduler"

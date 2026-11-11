@@ -6,11 +6,13 @@
  * webhooks/faire.ts.
  *
  * POST /api/webhooks/clover — Clover inventory/order/payment mutation
- *   events. Payloads are signal-only ({merchants: {mid: [{objectId,
- *   type, ts}]}}) — this endpoint only enqueues dirty rows into
- *   pos_dirty_items; the pos-dirty-flush job does the actual stock
- *   re-pull. Item events ('I:' objectIds) mark one item; order/payment
- *   events mark the whole integration dirty (NULL pos_item_id).
+ *   events plus App-level events. Payloads are signal-only
+ *   ({merchants: {mid: [{objectId, type, ts}]}}). Item events ('I:'
+ *   objectIds) mark one item dirty; order/payment events mark the whole
+ *   integration dirty (NULL pos_item_id); App events ('A:' objectIds) with
+ *   an UNINSTALL/DELETE type disconnect the integration — that is the only
+ *   signal we get when a merchant removes the app, since the token just
+ *   starts 401ing otherwise and the UI keeps showing a stale Connected.
  */
 
 import express, { Request, Response } from 'express';
@@ -94,6 +96,38 @@ router.post(
     for (const [merchantId, events] of Object.entries(merchants)) {
       const integrationId = byMerchant.get(merchantId);
       if (!integrationId || !Array.isArray(events)) continue;
+
+      // App-level events: an uninstall means the grant is gone — disconnect
+      // now (clear tokens) instead of letting polls 401 into 'token_expired'.
+      // Log every app-level event so real payload shapes are observable
+      // (INSTALL, UNINSTALL, and any type Clover adds later).
+      const appEvents = (events as any[]).filter((ev) => (ev?.objectId || '').startsWith('A:'));
+      if (appEvents.length > 0) {
+        logger.info('[Clover Webhook] app events received', undefined, {
+          merchantId,
+          events: appEvents.map((ev) => ({ type: ev?.type, ts: ev?.ts })),
+        });
+      }
+
+      const uninstalled = appEvents.some((ev) => {
+        const type: string = (ev?.type || '').toUpperCase();
+        return type === 'UNINSTALL' || type === 'DELETE';
+      });
+      if (uninstalled) {
+        await prisma.clover_integrations_list.update({
+          where: { id: integrationId },
+          data: {
+            status: 'disconnected',
+            access_token: null,
+            refresh_token: null,
+            token_expires_at: null,
+            last_sync_status: 'uninstalled',
+          },
+        });
+        logger.info('[Clover Webhook] app uninstalled — integration disconnected', undefined, { merchantId });
+        continue;
+      }
+
       let wholeIntegration = false;
       const itemIds = new Set<string>();
       for (const ev of events as any[]) {
