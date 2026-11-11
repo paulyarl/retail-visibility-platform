@@ -49,14 +49,18 @@ Recording conventions:
 ### [0:55–1:10] Optional: demo test-drive  *(the safety beat)*
 
 > "Not ready to connect yet? Demo mode fills your shelf with twenty-five sample
-> products — click around, test the sync, see how conflicts resolve. It's a
+> products — try the sync, upload a photo, see how a conflict resolves. It's a
 > test drive, not a live connection: nothing touches your Clover account, and
 > nothing reaches Google. When you do connect for real, the samples clear out
 > automatically and your real catalog takes over."
 
-*(Show: Enable Demo Mode → 25 items populate → maybe a quick Simulate-tab
-glance. The "clears out automatically" claim is real — connecting a real
-account purges demo items and mappings.)*
+*(Show: Enable Demo Mode → 25 items populate → Simulate tab. If filmed, pick
+one diff that reads visually — a stock_update or price_update landing — and
+optionally a conflict. The demo's real depth: 11 scenarios covering the full
+POS change vocabulary — item adds/updates/deletes/conflicts/failures/bulk,
+plus category adds/renames/moves/conflicts — paths a live connection takes
+weeks to hit naturally. The "clears out automatically" claim is real —
+connecting a real account purges demo items and mappings.)*
 
 ### [1:10–1:30] Clover OAuth consent  *(long hold — the permission story)*
 
@@ -75,8 +79,8 @@ account purges demo items and mappings.)*
 > "Here's the part that matters. Change something in Clover — a case of coconut
 > milk comes in, or a price goes from $1.99 to $2.19 — and within about fifteen
 > minutes, VisibleShelf picks it up automatically. Stock counts, prices, item
-> names — your register stays the source of truth for all of it. You never
-> update the same thing twice."
+> names, even new items and category changes — your register stays the source
+> of truth for all of it. You never update the same thing twice."
 
 *(Cut the wait: caption "15 min later (or Sync Now)", then show the new count
 on the Mappings/Products tab.)*

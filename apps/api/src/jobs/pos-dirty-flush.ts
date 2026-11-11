@@ -2,11 +2,11 @@
  * POS Dirty Flush Job — POS_STOCK_SYNC_SPEC §5.
  *
  * Every 15 min, group unflushed pos_dirty_items rows by integration and
- * re-pull stock via the same syncIntegration path the Clover poll job
- * uses (full mapped-item pull per integration — dedup means a busy
- * merchant costs ~1 read per 15 min regardless of webhook volume), then
- * mark the rows flushed. Webhook payloads carry no stock numbers; this
- * job is where the actual reconcile + SWIS push happens.
+ * re-run the same full catalog reconcile the Clover poll job uses (stock +
+ * price + name + category + new/deleted items — dedup means a busy merchant
+ * costs ~1 reconcile per 15 min regardless of webhook volume), then mark the
+ * rows flushed. Webhook payloads carry no field values; this job is where
+ * the actual reconcile + SWIS push happens.
  */
 
 import { prisma } from '../prisma';

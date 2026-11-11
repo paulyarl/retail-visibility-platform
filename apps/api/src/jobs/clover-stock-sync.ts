@@ -1,19 +1,26 @@
 /**
- * Clover Stock Sync Job — POS → platform lane (POS_STOCK_SYNC_SPEC.md §4).
+ * Clover Catalog Sync Job — POS → platform lane (POS_STOCK_SYNC_SPEC.md §4).
  *
- * Every 15 min, poll stockCount for every mapped item on every active
- * production Clover integration, reconcile into inventory_items.stock,
- * then push the dirty SWIS-listed items into Google's local inventory.
- * Demo integrations (the emulator lane) are never polled — mode guard
- * lives in the tenant-selection query, not the fetch.
+ * Every 15 min, fully reconcile every active production Clover integration:
+ * stock + price + name + category moves on mapped items (the demo's
+ * stock_update/price_update/category_items_moved vocabulary), new items
+ * (import or SKU-collision conflict), deleted items (archive), and category
+ * creates + renames — then push dirty SWIS-listed items into Google's local
+ * inventory. Demo integrations (the emulator lane) are never polled — mode
+ * guard lives in the tenant-selection query, not the fetch.
  */
 
 import { prisma } from '../prisma';
 import { logger } from '../logger';
 import { scheduleJob, stopJob } from './registry';
-import { generateCloverSyncLogId } from '../lib/id-generator';
+import {
+  generateCloverItemId,
+  generateCloverItemMappingsId,
+  generateCloverSyncLogId,
+  generateProductCatId,
+} from '../lib/id-generator';
 import { cloverApiBaseUrl, decryptToken } from '../services/clover-oauth';
-import posStockSyncService, { type PosStockDiff } from '../services/PosStockSyncService';
+import posStockSyncService, { type PosItemDiff } from '../services/PosStockSyncService';
 
 const JOB_NAME = 'clover-stock-sync';
 const DEFAULT_INTERVAL_MS = 15 * 60 * 1000;
@@ -79,8 +86,86 @@ async function fetchCloverStockCounts(
     if (elements.length < ITEMS_PAGE_LIMIT) break;
     offset += ITEMS_PAGE_LIMIT;
   }
-
   return { stockByItemId, httpStatus };
+}
+
+interface CloverItemSnapshot {
+  id: string;
+  name: string;
+  sku: string;
+  priceCents: number;
+  salePriceCents: number | null;
+  categoryId: string | null;
+}
+
+/**
+ * Paginate /v3/merchants/{id}/items?expand=categories → every item the
+ * merchant has. Must be complete — the delete-detection pass archives mapped
+ * items absent from this list, so a partial page would mass-archive. Any
+ * page failing throws and aborts the run before anything is applied.
+ */
+async function fetchCloverItems(
+  integration: { merchant_id: string; access_token: string },
+): Promise<CloverItemSnapshot[]> {
+  const items: CloverItemSnapshot[] = [];
+  let offset = 0;
+  for (;;) {
+    const res = await fetch(
+      `${cloverApiBaseUrl()}/v3/merchants/${integration.merchant_id}/items?expand=categories&limit=${ITEMS_PAGE_LIMIT}&offset=${offset}`,
+      { headers: { Authorization: `Bearer ${decryptToken(integration.access_token)}` } },
+    );
+    const bodyText = await res.text().catch(() => '');
+    if (!res.ok) {
+      throw Object.assign(new Error(`clover_items_${res.status}`), {
+        httpStatus: res.status,
+        body: bodyText.slice(0, 500),
+      });
+    }
+    let data: { elements?: any[] } = {};
+    try {
+      data = JSON.parse(bodyText);
+    } catch {
+      throw new Error('clover_items_non_json');
+    }
+    const elements = data.elements || [];
+    for (const item of elements) {
+      items.push({
+        id: item.id,
+        name: item.name,
+        sku: item.sku || item.code || `CLV-${item.id.substring(0, 8)}`,
+        priceCents: item.price || 0,
+        salePriceCents: item.priceType === 'VARIABLE'
+          ? null
+          : (item.alternatePrices?.[0]?.price || null),
+        categoryId: item.categories?.elements?.[0]?.id || null,
+      });
+    }
+    if (elements.length < ITEMS_PAGE_LIMIT) break;
+    offset += ITEMS_PAGE_LIMIT;
+  }
+  return items;
+}
+
+/**
+ * /v3/merchants/{id}/categories — best-effort. A failed fetch skips the
+ * category pass only; item reconcile still runs.
+ */
+async function fetchCloverCategories(
+  integration: { merchant_id: string; access_token: string },
+): Promise<Array<{ id: string; name: string }> | null> {
+  const res = await fetch(
+    `${cloverApiBaseUrl()}/v3/merchants/${integration.merchant_id}/categories`,
+    { headers: { Authorization: `Bearer ${decryptToken(integration.access_token)}` } },
+  );
+  if (!res.ok) {
+    logger.warn('[clover-stock-sync] categories fetch failed — category pass skipped', undefined, {
+      merchantId: integration.merchant_id,
+      httpStatus: res.status,
+    });
+    return null;
+  }
+  const data = await res.json() as { elements?: any[] };
+  return (data.elements || []).map((c: any) => ({ id: c.id, name: c.name }));
 }
 
 export async function syncIntegration(integration: {
@@ -92,64 +177,236 @@ export async function syncIntegration(integration: {
 }): Promise<void> {
   const startedAt = Date.now();
   const isBaseline = !integration.last_sync_at;
+  const tenantId = integration.tenant_id;
 
-  const mappings = await prisma.clover_item_mappings_list.findMany({
-    where: {
-      integration_id: integration.id,
-      mapping_status: 'mapped',
-      rvp_item_id: { not: null },
-    },
-    select: { clover_item_id: true, rvp_item_id: true },
-  });
-
-  const operation = isBaseline ? 'stock_sync_baseline' : 'stock_sync_poll';
+  const operation = isBaseline ? 'catalog_sync_baseline' : 'catalog_sync_poll';
   let status = 'success';
+  let itemsProcessed = 0;
   let itemsSucceeded = 0;
   let itemsFailed = 0;
   let errorMessage: string | null = null;
-  let swisPushed = 0;
-  let swisSkipped = 0;
+  const details: Record<string, number | boolean> = { baseline: isBaseline };
 
   try {
-    if (mappings.length > 0) {
-      const { stockByItemId } = await fetchCloverStockCounts(integration as any);
-      const diffs: PosStockDiff[] = [];
-      for (const m of mappings) {
-        const stock = stockByItemId.get(m.clover_item_id);
-        if (stock === undefined || !m.rvp_item_id) {
-          // Mapped item not returned by Clover — leave it alone this run.
-          itemsFailed++;
+    // All three fetches up front. /items must be a COMPLETE paginated set —
+    // the delete pass archives mapped items absent from it, so a partial
+    // result would mass-archive. A failed /items page throws and aborts the
+    // run before anything is applied; /categories failure skips only the
+    // category pass.
+    const [cloverItems, stockResult, cloverCategories] = await Promise.all([
+      fetchCloverItems(integration as any),
+      fetchCloverStockCounts(integration as any),
+      fetchCloverCategories(integration as any),
+    ]);
+    const cloverItemById = new Map(cloverItems.map((i) => [i.id, i]));
+    itemsProcessed = cloverItems.length;
+
+    const allMappings = await prisma.clover_item_mappings_list.findMany({
+      where: { integration_id: integration.id },
+      select: { id: true, clover_item_id: true, rvp_item_id: true, mapping_status: true },
+    });
+    const knownCloverIds = new Set(allMappings.map((m) => m.clover_item_id));
+
+    // ---- Category pass: new_category + category_renamed ------------------
+    // Builds the cloverCategoryId → directory_category id map item diffs
+    // use, so a category rename is applied before items move under it.
+    const rvpCategoryByCloverId = new Map<string, string>();
+    let categoriesCreated = 0;
+    let categoriesRenamed = 0;
+    if (cloverCategories) {
+      for (const cat of cloverCategories) {
+        const catMapping = await prisma.clover_category_mappings_list.findFirst({
+          where: { integration_id: integration.id, clover_category_id: cat.id },
+        });
+        if (catMapping?.rvp_category_id) {
+          rvpCategoryByCloverId.set(cat.id, catMapping.rvp_category_id);
+          if (catMapping.rvp_category_name !== cat.name) {
+            await prisma.directory_category.update({
+              where: { id: catMapping.rvp_category_id },
+              data: { name: cat.name, updatedAt: new Date() },
+            });
+            await prisma.clover_category_mappings_list.update({
+              where: { id: catMapping.id },
+              data: { clover_category_name: cat.name, rvp_category_name: cat.name, updated_at: new Date() },
+            });
+            categoriesRenamed++;
+          }
           continue;
         }
-        diffs.push({
-          inventoryItemId: m.rvp_item_id,
-          newStock: stock,
-          source: 'clover_poll',
-          posItemId: m.clover_item_id,
+
+        const slug = cat.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+        let rvpCategory = await prisma.directory_category.findFirst({
+          where: { tenantId, slug },
         });
+        if (!rvpCategory) {
+          rvpCategory = await prisma.directory_category.create({
+            data: {
+              id: generateProductCatId(tenantId),
+              tenantId,
+              name: cat.name,
+              slug,
+              isActive: true,
+              updatedAt: new Date(),
+            },
+          });
+          categoriesCreated++;
+        }
+        if (catMapping) {
+          await prisma.clover_category_mappings_list.update({
+            where: { id: catMapping.id },
+            data: { rvp_category_id: rvpCategory.id, rvp_category_name: cat.name, mapping_status: 'mapped', updated_at: new Date() },
+          });
+        } else {
+          await prisma.clover_category_mappings_list.create({
+            data: {
+              id: generateCloverItemMappingsId(),
+              integration_id: integration.id,
+              clover_category_id: cat.id,
+              clover_category_name: cat.name,
+              rvp_category_id: rvpCategory.id,
+              rvp_category_name: cat.name,
+              sync_direction: 'bidirectional',
+              mapping_status: 'mapped',
+              last_synced_at: new Date(),
+              last_sync_status: 'success',
+              updated_at: new Date(),
+            } as any,
+          });
+        }
+        rvpCategoryByCloverId.set(cat.id, rvpCategory.id);
       }
+    }
 
-      const reconciled = await posStockSyncService.reconcileStock(
-        integration.tenant_id,
-        diffs,
-      );
-      // unchanged items still count as a successful process — only true
-      // misses (not-in-Clover above, not-found/write-error below) are failed.
-      itemsSucceeded = reconciled.updated + reconciled.skipped;
-      itemsFailed += reconciled.failed;
+    // ---- Item diff pass: stock/price/name/category moves -----------------
+    const diffs: PosItemDiff[] = [];
+    for (const m of allMappings) {
+      if (m.mapping_status !== 'mapped' || !m.rvp_item_id) continue;
+      const ci = cloverItemById.get(m.clover_item_id);
+      if (!ci) continue; // absent → delete pass below
+      diffs.push({
+        inventoryItemId: m.rvp_item_id,
+        source: 'clover_poll',
+        posItemId: m.clover_item_id,
+        name: ci.name,
+        priceCents: ci.priceCents,
+        salePriceCents: ci.salePriceCents,
+        // undefined → stock untouched (untracked items aren't in item_stocks)
+        stock: stockResult.stockByItemId.get(ci.id),
+        directoryCategoryId: ci.categoryId ? (rvpCategoryByCloverId.get(ci.categoryId) ?? null) : null,
+      });
+      await prisma.clover_item_mappings_list.update({
+        where: { id: m.id },
+        data: { clover_item_name: ci.name, clover_sku: ci.sku, last_synced_at: new Date(), last_sync_status: 'success', updated_at: new Date() },
+      });
+    }
+    const reconciled = await posStockSyncService.reconcileItems(tenantId, diffs);
+    itemsSucceeded = reconciled.updated + reconciled.skipped;
+    itemsFailed = reconciled.failed;
+    details.updated = reconciled.updated;
+    details.unchanged = reconciled.skipped;
 
-      const pushed = await posStockSyncService.swisPushForDirty(
-        integration.tenant_id,
-        reconciled.swisDirty,
-      );
-      swisPushed = pushed.pushed;
-      swisSkipped = pushed.skipped;
-      if (pushed.errors.length > 0) {
-        errorMessage = `swis push errors: ${pushed.errors
-          .slice(0, 3)
-          .map((e) => `${e.itemId}:${e.error}`)
-          .join('; ')}`;
+    // ---- New items: create, or flag a SKU collision as conflict ----------
+    let itemsCreated = 0;
+    let conflictsCreated = 0;
+    for (const ci of cloverItems) {
+      if (knownCloverIds.has(ci.id)) continue;
+      const skuOwner = await prisma.inventory_items.findFirst({
+        where: { tenant_id: tenantId, sku: ci.sku },
+        select: { id: true },
+      });
+      if (skuOwner) {
+        // SKU collision with an unmapped item — same diff the demo 'conflict'
+        // scenario simulates. Point the conflict row at the existing item so
+        // the resolve endpoint can apply use_clover/use_rvp/custom onto it.
+        await prisma.clover_item_mappings_list.create({
+          data: {
+            id: generateCloverItemMappingsId(),
+            integration_id: integration.id,
+            clover_item_id: ci.id,
+            clover_item_name: ci.name,
+            clover_sku: ci.sku,
+            rvp_item_id: skuOwner.id,
+            rvp_sku: ci.sku,
+            mapping_status: 'conflict',
+            last_synced_at: new Date(),
+            last_sync_status: 'conflict',
+            updated_at: new Date(),
+          } as any,
+        });
+        conflictsCreated++;
+        continue;
       }
+      const newItem = await prisma.inventory_items.create({
+        data: {
+          id: generateCloverItemId(),
+          tenant_id: tenantId,
+          sku: ci.sku,
+          name: ci.name,
+          title: ci.name,
+          brand: 'Clover Import',
+          price_cents: ci.priceCents,
+          price: ci.priceCents / 100,
+          sale_price_cents: ci.salePriceCents,
+          stock: stockResult.stockByItemId.get(ci.id) ?? 0,
+          source: 'API_IMPORT',
+          directory_category_id: ci.categoryId ? (rvpCategoryByCloverId.get(ci.categoryId) ?? null) : null,
+          item_status: 'active',
+          visibility: 'public',
+          product_type: 'physical',
+          updated_at: new Date(),
+        } as any,
+      });
+      await prisma.clover_item_mappings_list.create({
+        data: {
+          id: generateCloverItemMappingsId(),
+          integration_id: integration.id,
+          clover_item_id: ci.id,
+          clover_item_name: ci.name,
+          clover_sku: ci.sku,
+          rvp_item_id: newItem.id,
+          rvp_sku: ci.sku,
+          mapping_status: 'mapped',
+          last_synced_at: new Date(),
+          last_sync_status: 'success',
+          updated_at: new Date(),
+        } as any,
+      });
+      itemsCreated++;
+      itemsSucceeded++;
+    }
+    details.created = itemsCreated;
+    details.conflicts = conflictsCreated;
+
+    // ---- Deleted items: archive ------------------------------------------
+    // Demo 'item_deleted' semantics — archive, never hard-delete; the item's
+    // photos/enrichment survive if Clover ever brings the item back.
+    let itemsArchived = 0;
+    for (const m of allMappings) {
+      // Only Clover-managed items archive — a 'conflict' mapping points at a
+      // merchant-owned item that must outlive a Clover-side delete.
+      if (m.mapping_status !== 'mapped' || !m.rvp_item_id || cloverItemById.has(m.clover_item_id)) continue;
+      await prisma.inventory_items.update({
+        where: { id: m.rvp_item_id },
+        data: { item_status: 'archived', updated_at: new Date() },
+      });
+      await prisma.clover_item_mappings_list.update({
+        where: { id: m.id },
+        data: { last_sync_status: 'archived', updated_at: new Date() },
+      });
+      itemsArchived++;
+    }
+    details.archived = itemsArchived;
+    details.categoriesCreated = categoriesCreated;
+    details.categoriesRenamed = categoriesRenamed;
+
+    const pushed = await posStockSyncService.swisPushForDirty(tenantId, reconciled.swisDirty);
+    details.swisPushed = pushed.pushed;
+    details.swisSkipped = pushed.skipped;
+    if (pushed.errors.length > 0) {
+      errorMessage = `swis push errors: ${pushed.errors
+        .slice(0, 3)
+        .map((e) => `${e.itemId}:${e.error}`)
+        .join('; ')}`;
     }
   } catch (err: any) {
     status = 'failed';
@@ -175,15 +432,11 @@ export async function syncIntegration(integration: {
       trace_id: `${JOB_NAME}-${Date.now()}`,
       operation,
       status,
-      items_processed: mappings.length,
+      items_processed: itemsProcessed,
       items_succeeded: itemsSucceeded,
       items_failed: itemsFailed,
       error_message: errorMessage,
-      error_details: {
-        swisPushed,
-        swisSkipped,
-        baseline: isBaseline,
-      } as any,
+      error_details: details as any,
       duration_ms: Date.now() - startedAt,
       completed_at: new Date(),
     },
@@ -226,7 +479,7 @@ async function run(): Promise<void> {
 export function startCloverStockSync(): void {
   scheduleJob({
     name: JOB_NAME,
-    description: 'Polls Clover item stock into inventory_items + SWIS local inventory push',
+    description: 'Reconciles Clover catalog (stock/price/name/category/items) into inventory_items + SWIS push',
     scheduleLabel: `every ${Math.round(pollIntervalMs() / 60000)} minutes`,
     computeNextDelay: () => pollIntervalMs(),
     envDisableVar: 'DISABLE_CLOVER_STOCK_SYNC',

@@ -876,15 +876,15 @@ router.get('/google/merchant/validation-report', authenticateToken, checkTenantA
 
     const { validateProductsForGMC } = await import('../services/GMCValidationService');
 
-    // Fetch all syncable inventory items for the tenant — CLOVER_DEMO items
-    // are test-drive data and never GMC-eligible.
+    // Fetch all syncable inventory items for the tenant — *_DEMO items
+    // (any POS provider's test-drive data) are never GMC-eligible.
     const items = await prisma.inventory_items.findMany({
       where: {
         tenant_id: tenantId,
         item_status: { not: 'trashed' },
         product_type: { in: ['physical', 'hybrid'] },
         visibility: 'public',
-        source: { not: 'CLOVER_DEMO' },
+        source: { notIn: ['CLOVER_DEMO'] },
       },
       take: 1000,
     });
@@ -959,13 +959,14 @@ router.get('/google/merchant/product-sync-status', authenticateToken, checkTenan
     }
 
     // Eligibility filter (spec §6.5): selectable = unified feed filter.
-    // CLOVER_DEMO items never reach Google — demo is a test drive, not a feed.
+    // *_DEMO items (any POS provider) never reach Google — a test drive, not
+    // a feed.
     if (req.query.selectable === 'true') {
       where.item_status = 'active';
       where.visibility = 'public';
       where.product_type = { in: ['physical', 'hybrid'] };
       where.google_online_excluded = { not: true };
-      where.source = { not: 'CLOVER_DEMO' };
+      where.source = { notIn: ['CLOVER_DEMO'] };
     }
 
     if (search) {

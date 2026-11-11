@@ -83,6 +83,64 @@ describe('reconcileStock', () => {
   });
 });
 
+describe('reconcileItems', () => {
+  it('marks swis_listed items dirty on price moves and writes price+price_cents', async () => {
+    mockFindUnique.mockResolvedValueOnce({
+      id: 'item-1', name: 'Coconut Milk', price_cents: 199, sale_price_cents: null,
+      stock: 5, directory_category_id: 'cat-1', swis_listed: true,
+    });
+    const res = await posStockSyncService.reconcileItems(TENANT, [
+      { inventoryItemId: 'item-1', priceCents: 219, source: 'clover_poll' },
+    ]);
+    expect(res.updated).toBe(1);
+    expect(res.swisDirty).toEqual(['item-1']);
+    expect(mockUpdate).toHaveBeenCalledWith({
+      where: { id: 'item-1' },
+      data: expect.objectContaining({ price_cents: 219, price: 2.19 }),
+    });
+  });
+
+  it('writes name/category moves without dirtying SWIS', async () => {
+    mockFindUnique.mockResolvedValueOnce({
+      id: 'item-1', name: 'Old Name', price_cents: 199, sale_price_cents: null,
+      stock: 5, directory_category_id: 'cat-1', swis_listed: true,
+    });
+    const res = await posStockSyncService.reconcileItems(TENANT, [
+      { inventoryItemId: 'item-1', name: 'New Name', directoryCategoryId: 'cat-2', source: 'clover_poll' },
+    ]);
+    expect(res.updated).toBe(1);
+    expect(res.swisDirty).toEqual([]);
+    expect(mockUpdate).toHaveBeenCalledWith({
+      where: { id: 'item-1' },
+      data: expect.objectContaining({ name: 'New Name', directory_category_id: 'cat-2' }),
+    });
+  });
+
+  it('skips when no field changed and leaves absent fields alone', async () => {
+    mockFindUnique.mockResolvedValueOnce({
+      id: 'item-1', name: 'Same', price_cents: 199, sale_price_cents: null,
+      stock: 5, directory_category_id: 'cat-1', swis_listed: false,
+    });
+    const res = await posStockSyncService.reconcileItems(TENANT, [
+      { inventoryItemId: 'item-1', name: 'Same', priceCents: 199, stock: 5, source: 'clover_poll' },
+    ]);
+    expect(res.updated).toBe(0);
+    expect(res.skipped).toBe(1);
+    expect(mockUpdate).not.toHaveBeenCalled();
+  });
+
+  it('stock moves still dirty swis_listed items (same as reconcileStock)', async () => {
+    mockFindUnique.mockResolvedValueOnce({
+      id: 'item-1', name: 'Item', price_cents: 199, sale_price_cents: null,
+      stock: 5, directory_category_id: 'cat-1', swis_listed: true,
+    });
+    const res = await posStockSyncService.reconcileItems(TENANT, [
+      { inventoryItemId: 'item-1', stock: 2, source: 'clover_webhook' },
+    ]);
+    expect(res.swisDirty).toEqual(['item-1']);
+  });
+});
+
 describe('swisPushForDirty', () => {
   it('returns empty result for no dirty items', async () => {
     const res = await posStockSyncService.swisPushForDirty(TENANT, []);
