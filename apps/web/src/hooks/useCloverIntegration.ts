@@ -217,6 +217,12 @@ export function useCloverIntegration(tenantId: string): UseCloverIntegrationResu
         alert('Successfully connected to Clover! Your inventory will sync shortly.');
         // Clean URL
         window.history.replaceState({}, '', window.location.pathname);
+      } else if (urlParams.get('clover') === 'installed') {
+        // Returned from a Clover App Market install — continue OAuth
+        // automatically so the merchant doesn't have to click Connect twice.
+        window.history.replaceState({}, '', window.location.pathname);
+        connect();
+        return;
       } else if (errorParam) {
         const errorMessage = message || errorParam;
         setError(`Connection failed: ${errorMessage}`);
@@ -226,7 +232,7 @@ export function useCloverIntegration(tenantId: string): UseCloverIntegrationResu
     }
     
     refresh();
-  }, [tenantId, refresh]);
+  }, [tenantId, refresh, connect]);
 
   return {
     data,
