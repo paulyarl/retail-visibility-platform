@@ -11,7 +11,7 @@ export default function SignupRedirectPage() {
   const router = useRouter();
 
   useEffect(() => {
-    router.replace('/auth/signup');
+    router.replace(`/auth/signup${window.location.search}`);
   }, [router]);
 
   return (

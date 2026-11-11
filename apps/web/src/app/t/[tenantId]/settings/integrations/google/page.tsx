@@ -140,6 +140,20 @@ export default function GoogleIntegrationsPage() {
     }
   }, [tenantId]);
 
+  // Clover lane continuation: arriving from a Clover connect with GMC
+  // unavailable → auto-continue into the Google OAuth, same pattern as the
+  // Clover ?clover=installed auto-continue.
+  useEffect(() => {
+    if (!gmcStatus || connecting) return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('from') !== 'clover') return;
+    window.history.replaceState({}, '', window.location.pathname);
+    if (gmcStatus.unavailable) {
+      handleConnectGoogle();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [gmcStatus]);
+
   async function handleConnectGoogle() {
     setConnecting(true);
     try {

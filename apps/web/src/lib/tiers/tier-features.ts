@@ -220,7 +220,7 @@ export const FEATURE_TIER_MAP: Record<string, string> = {
   integration_google_enabled: 'discovery',
   integration_google_shopping: 'discovery',
   integration_google_merchant_center: 'discovery',
-  integration_clover: 'starter',
+  integration_clover: 'discovery',
   integration_gmc_sync: 'commitment',
   integration_square: 'ecommerce',
   integration_gbp: 'ecommerce',

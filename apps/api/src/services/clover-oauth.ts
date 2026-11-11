@@ -23,11 +23,14 @@ const CLOVER_CONFIG = {
   }
 };
 
-// OAuth scopes required for inventory sync
+// OAuth scopes required for inventory sync.
+// Read-only by design — the Clover lane is one-way (register → platform →
+// Google); we never write back. inventory_w is intentionally absent: the
+// listing copy promises read-only, and Clover review compares declared
+// scopes to observed behavior.
 const REQUIRED_SCOPES = [
   'merchant_r',      // Read merchant information
   'inventory_r',     // Read inventory items
-  'inventory_w',     // Write inventory items (for sync)
 ];
 
 interface CloverOAuthConfig {
@@ -175,6 +178,7 @@ export async function exchangeCodeForToken(code: string): Promise<{
  */
 export async function refreshAccessToken(refreshToken: string): Promise<{
   access_token: string;
+  refresh_token?: string;
   expires_in?: number;
 }> {
   const config = getCloverConfig();
@@ -202,6 +206,7 @@ export async function refreshAccessToken(refreshToken: string): Promise<{
 
   return await response.json() as {
     access_token: string;
+    refresh_token?: string;
     expires_in?: number;
   };
 }
@@ -277,10 +282,6 @@ export function formatScopesForDisplay(): Array<{ scope: string; description: st
     {
       scope: 'inventory_r',
       description: 'Read your inventory items and stock levels'
-    },
-    {
-      scope: 'inventory_w',
-      description: 'Update inventory when syncing changes'
     }
   ];
 }

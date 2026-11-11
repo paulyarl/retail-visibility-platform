@@ -29,7 +29,7 @@ export default function PrivacyPage() {
           <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
             <h1 className="text-4xl font-bold text-neutral-900 mb-4">Privacy Policy</h1>
             <p className="text-neutral-600 mb-8 text-sm">
-              Last updated: November 2025
+              Last updated: November 2026
             </p>
 
             <p className="text-neutral-700 mb-6">
@@ -51,6 +51,12 @@ export default function PrivacyPage() {
               <li>
                 Customer data your connected commerce tools send to us (for example, order history
                 and buyer contact details), when those integrations are enabled.
+              </li>
+              <li>
+                Data and access credentials from POS and discovery integrations you connect — for
+                example, Clover merchant details and inventory items, stock levels, and prices under
+                read-only permissions, and the OAuth tokens used to keep the connection working,
+                stored encrypted.
               </li>
               <li>Usage data (feature usage, performance metrics, error logs).</li>
               <li>Billing details processed via our payment providers (Square, PayPal).</li>
@@ -99,11 +105,19 @@ export default function PrivacyPage() {
             </p>
 
             <h2 className="text-2xl font-semibold text-neutral-900 mt-10 mb-3">5. Data Retention</h2>
-            <p className="text-neutral-700 mb-4">
+            <p className="text-neutral-700 mb-3">
               We retain your data for as long as you have an active account. When you cancel, we
               typically preserve data for a limited retention window so you can reactivate without
               losing everything. After that window, we may delete or anonymize data in line with our
               retention policies and legal obligations.
+            </p>
+            <p className="text-neutral-700 mb-4">
+              When you disconnect an integration or uninstall our app from a provider&apos;s
+              marketplace, we delete the stored access credentials for that connection and stop
+              syncing. Data previously synced into your catalog is retained under your account&apos;s
+              normal retention; catalog data already published to third parties (such as Google
+              Merchant Center or your Google Business Profile) stops updating and is removed
+              according to that provider&apos;s own deletion processes.
             </p>
 
             <h2 className="text-2xl font-semibold text-neutral-900 mt-10 mb-3">6. Your Choices</h2>
@@ -111,6 +125,7 @@ export default function PrivacyPage() {
             <ul className="list-disc list-inside text-neutral-700 space-y-1 mb-4">
               <li>Update your account and business details from the Settings pages.</li>
               <li>Export key data (like products and inventory) from within the app.</li>
+              <li>Disconnect a POS or Google integration at any time from Settings → Integrations.</li>
               <li>Request account cancellation via the in-product flows or by contacting support.</li>
               <li>
                 Depending on where you are located, you may have additional rights (like access,

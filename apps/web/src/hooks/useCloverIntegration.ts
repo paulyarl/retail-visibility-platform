@@ -4,6 +4,9 @@ import { useState, useEffect, useCallback } from 'react';
 import { CloverStatus } from '@/components/clover';
 import { cloverIntegrationService } from '@/services/CloverIntegrationSingletonService';
 import { clientLogger } from '@/lib/client-logger';
+import { onboardingStateService } from '@/services/OnboardingStateService';
+import { platformHomeService } from '@/services/PlatformHomeSingletonService';
+import { laneFromPhase1 } from '@/lib/onboarding/lanes';
 
 interface CloverIntegrationData {
   enabled: boolean;
@@ -17,6 +20,7 @@ interface CloverIntegrationData {
   demoEnabledAt?: string;
   demoLastActiveAt?: string;
   lastSyncAt?: string;
+  lastSyncStatus?: string | null;
 }
 
 interface UseCloverIntegrationResult {
@@ -217,6 +221,22 @@ export function useCloverIntegration(tenantId: string): UseCloverIntegrationResu
         alert('Successfully connected to Clover! Your inventory will sync shortly.');
         // Clean URL
         window.history.replaceState({}, '', window.location.pathname);
+        // Clover App Market lane: the connect only delivers its promise once
+        // SWIS is live — if GMC isn't connected yet, continue the lane to the
+        // Google connect step. (Fire-and-forget; failure leaves the merchant
+        // on the integrations page, which is still a correct state.)
+        if (laneFromPhase1(onboardingStateService.getPhase1())?.id === 'clover_market') {
+          void (async () => {
+            try {
+              const gmc = await platformHomeService.getGoogleMerchantSyncStatus(tenantId);
+              if (gmc?.unavailable) {
+                window.location.assign(`/t/${tenantId}/settings/integrations/google?from=clover`);
+              }
+            } catch {
+              // Status check failed — stay on the integrations page.
+            }
+          })();
+        }
       } else if (urlParams.get('clover') === 'installed') {
         // Returned from a Clover App Market install — continue OAuth
         // automatically so the merchant doesn't have to click Connect twice.
@@ -224,7 +244,12 @@ export function useCloverIntegration(tenantId: string): UseCloverIntegrationResu
         connect();
         return;
       } else if (errorParam) {
-        const errorMessage = message || errorParam;
+        const friendly: Record<string, string> = {
+          inventory_module_missing: 'Connected, but your Clover plan has no Inventory module — there is nothing to sync. Upgrade your Clover plan or disconnect.',
+          oauth_denied: 'Clover connection was denied.',
+          state_expired: 'Connection request expired — try Connect again.',
+        };
+        const errorMessage = message || friendly[errorParam] || errorParam;
         setError(`Connection failed: ${errorMessage}`);
         // Clean URL
         window.history.replaceState({}, '', window.location.pathname);

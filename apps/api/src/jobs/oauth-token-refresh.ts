@@ -7,6 +7,7 @@
 import { prisma } from '../prisma';
 import { PayPalOAuthService } from '../services/paypal/PayPalOAuthService';
 import { SquareOAuthService } from '../services/square/SquareOAuthService';
+import { refreshAccessToken as refreshCloverAccessToken, encryptToken, decryptToken, calculateTokenExpiration } from '../services/clover-oauth';
 import { logger } from '../logger';
 import { scheduleJob, stopJob } from './registry';
 
@@ -75,6 +76,63 @@ async function refreshToken(tenantId: string, gatewayType: string): Promise<Toke
 }
 
 /**
+ * Refresh expiring Clover tokens. Clover rows live in clover_integrations_list
+ * (not oauth_tokens), so they get their own sweep. Production OAuth returns
+ * expiring access tokens + a rotating refresh_token; sandbox tokens never
+ * expire, so this is a no-op until production merchants exist.
+ */
+async function refreshCloverTokens(): Promise<{ refreshed: number; failed: number }> {
+  const threshold = new Date(Date.now() + TOKEN_EXPIRY_THRESHOLD_MS);
+
+  const expiring = await prisma.clover_integrations_list.findMany({
+    where: {
+      status: { not: 'disconnected' },
+      refresh_token: { not: null },
+      token_expires_at: { not: null, lte: threshold },
+    },
+    select: {
+      id: true,
+      tenant_id: true,
+      refresh_token: true,
+      token_expires_at: true,
+    },
+  });
+
+  let refreshed = 0;
+  let failed = 0;
+
+  for (const integration of expiring) {
+    try {
+      const tokens = await refreshCloverAccessToken(decryptToken(integration.refresh_token!));
+      await prisma.clover_integrations_list.update({
+        where: { id: integration.id },
+        data: {
+          access_token: encryptToken(tokens.access_token),
+          // Persist the rotated refresh token if Clover returns one — the old
+          // one may be invalidated by the rotation.
+          ...(tokens.refresh_token ? { refresh_token: encryptToken(tokens.refresh_token) } : {}),
+          ...(tokens.expires_in ? { token_expires_at: calculateTokenExpiration(tokens.expires_in) } : {}),
+        },
+      });
+      refreshed++;
+      console.log(`[OAuth Token Refresh] Refreshed clover token for tenant ${integration.tenant_id}`);
+    } catch (error) {
+      failed++;
+      // Surface a real failure state — a Connected badge on a dead token is a lie.
+      await prisma.clover_integrations_list.update({
+        where: { id: integration.id },
+        data: { last_sync_status: 'token_expired' },
+      }).catch(() => undefined);
+      logger.error(`[OAuth Token Refresh] Clover refresh failed for tenant ${integration.tenant_id}:`, undefined, { error: error instanceof Error ? { name: error.name, message: error.message, stack: error.stack } : { name: 'Error', message: String(error) } });
+    }
+
+    await new Promise(resolve => setTimeout(resolve, 500));
+  }
+
+  return { refreshed, failed };
+}
+
+/**
  * Run token refresh for all tokens expiring soon
  */
 async function runScheduledRefresh(): Promise<void> {
@@ -84,11 +142,6 @@ async function runScheduledRefresh(): Promise<void> {
   try {
     const tokensNeedingRefresh = await getTokensNeedingRefresh();
     console.log(`[OAuth Token Refresh] Found ${tokensNeedingRefresh.length} tokens needing refresh`);
-
-    if (tokensNeedingRefresh.length === 0) {
-      console.log('[OAuth Token Refresh] No tokens need refresh, skipping');
-      return;
-    }
 
     let totalRefreshed = 0;
     let totalFailed = 0;
@@ -109,6 +162,10 @@ async function runScheduledRefresh(): Promise<void> {
       // Small delay between refreshes to avoid rate limiting
       await new Promise(resolve => setTimeout(resolve, 500));
     }
+
+    const clover = await refreshCloverTokens();
+    totalRefreshed += clover.refreshed;
+    totalFailed += clover.failed;
 
     const duration = ((Date.now() - startTime) / 1000).toFixed(1);
     console.log(`[OAuth Token Refresh] Completed in ${duration}s: ${totalRefreshed} refreshed, ${totalFailed} failed`);
