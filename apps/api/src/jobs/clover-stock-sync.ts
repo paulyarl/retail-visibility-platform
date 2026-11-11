@@ -129,8 +129,10 @@ export async function syncIntegration(integration: {
         integration.tenant_id,
         diffs,
       );
-      itemsSucceeded = reconciled.updated;
-      itemsFailed += reconciled.skipped;
+      // unchanged items still count as a successful process — only true
+      // misses (not-in-Clover above, not-found/write-error below) are failed.
+      itemsSucceeded = reconciled.updated + reconciled.skipped;
+      itemsFailed += reconciled.failed;
 
       const pushed = await posStockSyncService.swisPushForDirty(
         integration.tenant_id,
