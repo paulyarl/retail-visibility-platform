@@ -350,7 +350,7 @@ export async function batchSyncToMerchant(tenantId: string, itemIds?: string[]):
   try {
     const ctx = await getMerchantContext(tenantId);
     if (!ctx) {
-      return { success: false, total: 0, synced: 0, failed: 0, results: [{ success: false, productId: '', offerId: '', error: 'No valid access token or merchant link' }] };
+      return { success: false, total: 0, synced: 0, failed: 1, results: [{ success: false, productId: '', offerId: '', error: 'No valid access token or merchant link' }] };
     }
 
     // Unified eligibility (spec §6.5): Google shows exactly what the public
@@ -432,7 +432,9 @@ export async function batchSyncToMerchant(tenantId: string, itemIds?: string[]):
     };
   } catch (error: any) {
     logger.error('[MerchantProductSync] Batch sync error:', undefined, { error: { name: error?.name || 'Error', message: error?.message || String(error), stack: error?.stack } });
-    return { success: false, total: 0, synced: 0, failed: 0, results: [{ success: false, productId: '', offerId: '', error: error?.message }] };
+    // failed:1 — a batch-level error must not report as a clean 0/0 run; the
+    // scheduled job and callers count `failed` to detect silent breakage.
+    return { success: false, total: 0, synced: 0, failed: 1, results: [{ success: false, productId: '', offerId: '', error: error?.message }] };
   }
 }
 

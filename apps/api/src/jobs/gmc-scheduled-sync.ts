@@ -62,13 +62,16 @@ async function runScheduledSync(): Promise<void> {
     let totalSynced = 0;
     let totalFailed = 0;
     let tenantsProcessed = 0;
+    let tenantErrors = 0;
 
     for (const tenantId of tenantIds) {
       try {
+        tenantsProcessed++;
         // Skip tenants whose tier doesn't allow GMC sync
         const allowed = await isGMCSyncAllowed(tenantId);
         if (!allowed) {
           console.log(`[GMC Scheduled Sync] Skipping tenant ${tenantId}: GMC sync not allowed on current plan`);
+          tenantsProcessed--;
           continue;
         }
 
@@ -77,12 +80,17 @@ async function runScheduledSync(): Promise<void> {
         
         totalSynced += result.synced;
         totalFailed += result.failed;
-        tenantsProcessed++;
+        if (!result.success) {
+          tenantErrors++;
+          const firstError = result.results.find(r => !r.success)?.error;
+          logger.error(`[GMC Scheduled Sync] Tenant ${tenantId} batch failed: ${firstError || 'unknown'}`, undefined);
+        }
 
         console.log(`[GMC Scheduled Sync] Tenant ${tenantId}: ${result.synced} synced, ${result.failed} failed`);
       } catch (error) {
         logger.error(`[GMC Scheduled Sync] Error syncing tenant ${tenantId}:`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
         totalFailed++;
+        tenantErrors++;
       }
 
       // Small delay between tenants to avoid rate limiting
@@ -91,8 +99,18 @@ async function runScheduledSync(): Promise<void> {
 
     const duration = ((Date.now() - startTime) / 1000).toFixed(1);
     console.log(`[GMC Scheduled Sync] Completed in ${duration}s: ${tenantsProcessed} tenants, ${totalSynced} products synced, ${totalFailed} failed`);
+
+    // Every attempted tenant failed — this is an outage/auth break, not a
+    // per-item problem. Throw so the run row is marked failed instead of
+    // reporting a clean "success" while syncing nothing.
+    if (tenantsProcessed > 0 && tenantErrors === tenantsProcessed) {
+      throw new Error(`[GMC Scheduled Sync] all ${tenantsProcessed} tenant sync(s) failed (${totalFailed} item failures, 0 synced)`);
+    }
   } catch (error) {
     logger.error('[GMC Scheduled Sync] Scheduled sync failed:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    // Rethrow — the JobRegistry only marks the run 'failed' when the handler
+    // throws; swallowing here is what made broken syncs look green.
+    throw error;
   }
 }
 
