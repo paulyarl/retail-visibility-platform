@@ -33,7 +33,10 @@ export interface PosStockDiff {
 
 export interface ReconcileResult {
   updated: number;
+  /** Already in sync — processed successfully, nothing to write. */
   skipped: number;
+  /** Real misses — item not found or write errored. */
+  failed: number;
   /** swis_listed items whose stock changed — the downstream hand-off. */
   swisDirty: string[];
 }
@@ -59,6 +62,7 @@ class PosStockSyncService {
   ): Promise<ReconcileResult> {
     let updated = 0;
     let skipped = 0;
+    let failed = 0;
     const swisDirty: string[] = [];
 
     for (const diff of diffs) {
@@ -69,7 +73,7 @@ class PosStockSyncService {
           select: { id: true, stock: true, swis_listed: true },
         });
         if (!item) {
-          skipped++;
+          failed++;
           continue;
         }
         if ((item.stock ?? 0) === newStock) {
@@ -83,7 +87,7 @@ class PosStockSyncService {
         updated++;
         if (item.swis_listed) swisDirty.push(item.id);
       } catch (err) {
-        skipped++;
+        failed++;
         logger.warn('[PosStockSync] reconcile item failed (non-fatal)', undefined, {
           tenantId,
           inventoryItemId: diff.inventoryItemId,
@@ -93,7 +97,7 @@ class PosStockSyncService {
       }
     }
 
-    return { updated, skipped, swisDirty };
+    return { updated, skipped, failed, swisDirty };
   }
 
   /**
