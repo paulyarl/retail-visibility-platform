@@ -5,7 +5,7 @@
  * Provides realistic sample data for testing and evaluation.
  */
 
-import { availability_status, product_source } from '@prisma/client';
+import { availability_status, item_visibility, product_source } from '@prisma/client';
 
 /**
  * Category mapping from Clover categories to Google taxonomy category paths
@@ -713,6 +713,9 @@ export function convertDemoItemToVSFormat(demoItem: DemoItem) {
     stock: demoItem.stock,
     availability: demoItem.stock > 0 ? availability_status.in_stock : availability_status.out_of_stock,
     source: product_source.CLOVER_DEMO,
+    // Demo items are never public surfaces — not on the storefront, not in the
+    // sitemap, not near Google. The tenant still sees them in inventory.
+    visibility: item_visibility.private,
     // Proper category assignment following platform standards
     category_path: categoryMapping ? categoryMapping.path : [demoItem.category],
     metadata: {

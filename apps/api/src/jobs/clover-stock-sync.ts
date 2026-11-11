@@ -347,8 +347,10 @@ export async function syncIntegration(integration: {
     let conflictsCreated = 0;
     for (const ci of cloverItems) {
       if (knownCloverIds.has(ci.id)) continue;
+      // Demo items never own a real SKU — a collision with an overlay sample
+      // is transient and resolves when the toggle flips off.
       const skuOwner = await prisma.inventory_items.findFirst({
-        where: { tenant_id: tenantId, sku: ci.sku },
+        where: { tenant_id: tenantId, sku: ci.sku, source: { not: 'CLOVER_DEMO' } },
         select: { id: true },
       });
       if (skuOwner) {
@@ -443,7 +445,12 @@ export async function syncIntegration(integration: {
     for (const m of allMappings) {
       // Only Clover-managed items archive — a 'conflict' mapping points at a
       // merchant-owned item that must outlive a Clover-side delete.
-      if (m.mapping_status !== 'mapped' || !m.rvp_item_id || cloverItemById.has(m.clover_item_id)) continue;
+      // demo_* mappings belong to the overlay — they are never in the real
+      // Clover catalog, so without this guard every poll would archive the
+      // 25 sample items while the test drive is running.
+      if (m.mapping_status !== 'mapped' || !m.rvp_item_id
+          || m.clover_item_id.startsWith('demo_')
+          || cloverItemById.has(m.clover_item_id)) continue;
       const archivedItem = await prisma.inventory_items.findUnique({
         where: { id: m.rvp_item_id },
         select: { name: true, sku: true },

@@ -91,7 +91,7 @@ differ.
 | # | Decision | Resolution | What it creates |
 | --- | --- | --- | --- |
 | 6.5 | Fresh-install destination | **New-tenant registration flow**, landing in an integration-capability-aware tier | §7.1 rewritten; §7.11, §7.14 |
-| 6.1 | Pricing vs Starter gate | **30-day trial auto-granted on install** | §7.11, §7.12, copy in §3 |
+| 6.1 | Pricing vs Starter gate | **14-day trial auto-granted on install** (`TRIAL_DURATION_DAYS = 14`) | §7.11, §7.12, copy in §3 |
 | 6.2 | Merchant availability | **All Clover plans** | §7.13 (Inventory-module detection) becomes mandatory |
 | 6.3 | Categories | Inventory Management + Retail, positioned as a **product visibility connector** | §2 reframed, §3 revised |
 | 6.4 | App name | `VisibleShelf — Local Inventory Sync` | Verify Clover name-length limit (35 chars) |
@@ -472,7 +472,7 @@ it is the thing Pointy cannot do for a non-barcoded item.
 
 | # | Decision | Resolution |
 | --- | --- | --- |
-| 6.1 | Pricing model | Free listing + 30-day trial auto-granted on install *(trial mechanism under review — §6.7)* |
+| 6.1 | Pricing model | Free listing + 14-day trial auto-granted on install (`TRIAL_DURATION_DAYS = 14`; mechanism per §6.7) |
 | 6.2 | Merchant availability | All Clover plans |
 | 6.3 | Categories / positioning | Inventory Management + Retail; product visibility connector |
 | 6.4 | App name | `VisibleShelf — Clover Inventory to Google Search & Maps` (v8 — SWIS destination named; "See What's In Store" stays out of the title to avoid implied-endorsement flags) |
@@ -813,12 +813,18 @@ the event plumbing is in place when this activates.
 Demo mode turned out to be a product asset worth carrying to future POS
 connectors (Square, NRS, Lightspeed). The contract it implements:
 
-- **Test drive, not pipeline.** Strict boolean — the integration is demo or
-  live, never mixed. Demo items (`source = 'CLOVER_DEMO'`,
-  `metadata.isDemoData`) are excluded from GMC push, Products-tab selection,
-  and validation; connecting a real account purges demo items + mappings in
-  the OAuth callback; production-mode tenants can't re-enter demo (API guard
-  + UI hides the affordance).
+- **Test drive, on demand.** Demo is a reversible overlay, not a mode the
+  integration graduates out of — a production tenant can flip it on anytime
+  (`demo_enabled_at` set, `mode` stays `production`, live sync keeps running
+  on real items) and off again (only `demo_%` mappings + their items are
+  removed). Same posture as Clover's own sandbox-alongside-production model.
+  The walls are at the data layer: demo items carry `source = 'CLOVER_DEMO'`,
+  `metadata.isDemoData`, and `visibility = 'private'` — excluded from GMC
+  push, Products-tab selection, validation, storefront catalog, and the
+  product sitemap. Sync-side guards keep the overlay non-destructive:
+  `demo_`-prefixed mappings are immune to archive-on-delete polling, and demo
+  items can never own a SKU for conflict detection. A pure demo→production
+  OAuth conversion still purges all demo data before flipping `mode`.
 - **Diff simulator, not static data.** 11 scenarios cover the full POS change
   vocabulary: item add/update/delete/conflict/failure/bulk + category
   add/rename/move/conflict (`clover-demo-emulator.ts`). These are the paths
@@ -856,8 +862,9 @@ merchant; the steps below are what they click.
    integrations page fills the catalog with 25 sample products. The Simulate
    tab then exercises the full sync vocabulary — item add/update/delete,
    stock and price changes, conflicts, sync failures, and category
-   add/rename/moves. Demo items never reach Google, and connecting a real
-   account clears them automatically — demo and live never coexist.
+   add/rename/moves. Demo items never reach Google or the public storefront,
+   and they clear automatically — either when you connect a real account or
+   by toggling demo mode off.
 4. Clover then shows its permission screen. Note the scopes: the app requests
    **read-only** access to inventory and business information. It cannot touch
    orders, payments, customers, or the register — Clover enforces that. Approve
@@ -907,3 +914,79 @@ Support during review: `support@visibleshelf.com`.
 - [ ] Disconnect verified on a sub-`discovery` tenant (§7.4)
 - [x] How-to-test notes drafted (§9.4 — paste into the reviewer-instructions field at submission)
 - [ ] App Market Spotlight pitch sent (§8 step 10)
+
+## 11. Code-freeze runway (Nov 10, 2026 – Jan 3, 2027)
+
+Clover's banner: *"Platform updates and app approvals are paused."* ~8-week
+window. Approvals can't land before Jan 3 — so the goal is a **complete,
+file-ready package by late December**, submitted in the first post-freeze
+review batch. What still works during the freeze: draft-app field edits,
+test-merchant installs, sandbox + production sync — everything except the
+review itself. That makes this the ideal quiet period to burn the live-verify
+list (§10) on real traffic.
+
+Current state: production app exists **IN DRAFT**, Site URL =
+`…/api/integrations/clover/oauth/callback`, 1 merchant bound — the prod OAuth
+pipeline is already proven end-to-end.
+
+### Workstream A — Video (the window's main task)
+
+- [ ] Record `CLOVER_FUNCTIONAL_VIDEO_SCRIPT.md` (~3:00, 8 beats).
+  - Demo beat [0:55–1:10] can be recorded on **any tenant** — the demo
+    overlay toggles on top of production now, so the test merchant itself can
+    show Enable Demo → 25 sample items → simulate → Disable.
+  - Live beats (OAuth → Sync Now → Clover-side edit → GMC push) use the real
+    test merchant; the History tab now shows field-level diffs on production
+    syncs — worth a cutaway.
+- [ ] Upload unlisted YouTube; URL goes in the listing + reviewer notes.
+
+### Workstream B — Listing assets
+
+- [ ] Icon: brand mark, square, legible at Clover's small size (§10)
+- [ ] ≥2 screenshots incl. a no-photo item still listed (§10)
+- [ ] Paste §3.9 v8 field block into the draft app; pricing badge = FREE with
+      disclosed platform tiers (14-day trial — §6.1 corrected)
+- [ ] Merchant testimonial sourced (Pointy pattern, §10)
+
+### Workstream C — Live verification on production (§10 boxes)
+
+- [ ] Fresh-install from a merchant with no prior binding → trial grant
+- [ ] Existing-merchant install binds, no duplicate tenant
+- [ ] Merchant without Inventory module → explicit state (§7.13)
+- [ ] Token refresh: force-expired access token (§7.3)
+- [ ] Cap/expiry boundary shows on the card (§7.12)
+- [ ] Disconnect on sub-`discovery` tenant (§7.4)
+- [ ] 11-photo push on a SWIS-listed item, not tier-gated (§7.17)
+- [ ] History tab shows a real `auditTrail` diff row from a production sync
+      (new producer — poll, dirty-flush, and Sync Now all write it)
+
+### Workstream D — Compliance + cutover (§8.2 open boxes)
+
+- [ ] `CLOVER_ENVIRONMENT=production`, client creds, redirect URI, launch
+      path, webhook URL + `CLOVER_WEBHOOK_SECRET` — all confirmed set
+- [ ] Purge/flag sandbox `clover_integrations_list` rows (§7.6)
+- [ ] `scheduled_jobs`/`scheduled_job_runs` on prod (cross-instance lease)
+- [ ] Rotate `CLOVER_TOKEN_ENCRYPTION_KEY` before external merchants join
+- [ ] Privacy/ToS live incl. §9.2 retention clause — "stops updating," never
+      "removed within one sync cycle"; state a sync-log retention number
+- [ ] `support@visibleshelf.com` monitored
+- [ ] Developer account verification + Site URL approval status confirmed
+      (screenshot shows both fields populated — verify no pending badge)
+
+### Workstream E — Optional residuals (not submission blockers)
+
+- `use_rvp` conflict path → unlink/keep-separate (read-only scopes make
+  write-back impossible)
+- Remove `keepItems` from demo disable → strict "off removes the 25"
+- GMC deletion sweep for archived items — real feature build if reviewers
+  push (§9.2 honest claim stands until then)
+
+### Suggested order
+
+1. **Weeks 1–2**: C + D — verify everything while traffic is quiet; fix
+   what fails. E items only if a verification exposes them.
+2. **Weeks 3–5**: A — cut the video (needs a clean verification first).
+3. **Week 6**: B — shoot screenshots off the verified build, paste fields.
+4. **Early Jan**: submit listing + send the Spotlight pitch (§8 step 10 —
+   the email can go out during the freeze; distribution is the long pole,
+   not approval).
