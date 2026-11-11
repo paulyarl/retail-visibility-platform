@@ -462,9 +462,12 @@ router.get('/:tenantId/clover/oauth/authorize', authenticateToken, checkTenantAc
     });
 
     // "Already connected" means a live production connection — a
-    // disconnected row (status/token cleared) must be re-authorizable.
+    // disconnected row (status/token cleared) must be re-authorizable,
+    // as must an expired/uninstalled token Clover has revoked.
+    const deadStates = ['token_expired', 'uninstalled'];
     if (integration && integration.mode === 'production'
-        && integration.status === 'active' && integration.access_token) {
+        && integration.status === 'active' && integration.access_token
+        && !deadStates.includes(integration.last_sync_status || '')) {
       return res.status(400).json({
         error: 'already_connected',
         message: 'Clover account already connected'
