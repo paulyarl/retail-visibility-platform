@@ -495,7 +495,9 @@ router.get('/:tenantId/clover/oauth/authorize', authenticateToken, checkTenantAc
  */
 router.get('/clover/oauth/callback', async (req: Request, res: Response) => {
   try {
-    const { code, state, error: oauthError } = req.query;
+    // Clover also redirects with merchant_id/employee_id/client_id —
+    // merchant_id is NOT in the token response, so capture it here.
+    const { code, state, error: oauthError, merchant_id: callbackMerchantId } = req.query;
 
     // Check for OAuth errors
     if (oauthError) {
@@ -535,6 +537,9 @@ router.get('/clover/oauth/callback', async (req: Request, res: Response) => {
       ? calculateTokenExpiration(tokenData.expires_in)
       : null;
 
+    // Prefer the callback's merchant_id; token response rarely has one.
+    const merchantId = (callbackMerchantId as string) || tokenData.merchant_id || '';
+
     // Find or create integration
     let integration = await prisma.clover_integrations_list.findFirst({
       where: { tenant_id: tenantId }
@@ -550,7 +555,7 @@ router.get('/clover/oauth/callback', async (req: Request, res: Response) => {
           access_token: encryptedAccessToken,
           refresh_token: encryptedRefreshToken,
           token_expires_at: tokenExpiresAt,
-          merchant_id: tokenData.merchant_id,
+          merchant_id: merchantId,
           production_enabled_at: new Date()
         }
       });
@@ -565,7 +570,7 @@ router.get('/clover/oauth/callback', async (req: Request, res: Response) => {
           access_token: encryptedAccessToken,
           refresh_token: encryptedRefreshToken,
           token_expires_at: tokenExpiresAt,
-          merchant_id: tokenData.merchant_id,
+          merchant_id: merchantId,
           production_enabled_at: new Date(),
           updated_at: new Date()
         } as any
