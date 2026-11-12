@@ -86,6 +86,15 @@ them before the integration goes live.)*
 *(Cut the wait: caption "15 min later (or Sync Now)", then show the new count
 on the Mappings/Products tab.)*
 
+*(Optional cutaway — the History tab is the strongest silent proof in the
+whole video: expand a "catalog sync poll" row to show colored badges with
+field-level old→new values — `UPDATED · item · $1.99 → $2.19`. If time
+allows before shooting, seed the other three badges: a new Clover item →
+`CREATED`, a Clover-side delete → `ARCHIVED`, and a platform item whose SKU
+collides with a new Clover item → `CONFLICT` (resolve it live on the
+Mappings tab — "we never silently overwrite your inventory" is the safety
+argument Pointy can't make).)*
+
 ### [2:20–2:40] Add a product that isn't in Clover
 
 > "And not everything you sell lives in the register — a lunch special, a
