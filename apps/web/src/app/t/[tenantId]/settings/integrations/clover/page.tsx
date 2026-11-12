@@ -910,8 +910,13 @@ export default function CloverIntegrationPage() {
                   <h3 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100">Item Mappings</h3>
                   <div className="flex gap-2 mt-1">
                     <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300">
-                      {mappings.filter(m => m.mapping_status === 'mapped').length} synced from Clover
+                      {mappings.filter(m => m.mapping_status === 'mapped' && !m.clover_item_id.startsWith('demo_')).length} synced from Clover
                     </span>
+                    {mappings.filter(m => m.clover_item_id.startsWith('demo_')).length > 0 && (
+                      <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300">
+                        {mappings.filter(m => m.clover_item_id.startsWith('demo_')).length} demo
+                      </span>
+                    )}
                     <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300">
                       {platformOnlyItems.length} platform-only
                     </span>
@@ -966,12 +971,18 @@ export default function CloverIntegrationPage() {
                             )}
                           </td>
                           <td className="px-4 py-3">
-                            <span className={`px-2 py-1 rounded text-xs font-medium ${mapping.mapping_status === 'mapped' ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300' :
-                                mapping.mapping_status === 'conflict' ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300' :
-                                  'bg-neutral-100 text-neutral-600 dark:bg-neutral-700 dark:text-neutral-400'
-                              }`}>
-                              {mapping.mapping_status}
-                            </span>
+                            {mapping.clover_item_id.startsWith('demo_') ? (
+                              <span className="px-2 py-1 rounded text-xs font-medium bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300">
+                                demo
+                              </span>
+                            ) : (
+                              <span className={`px-2 py-1 rounded text-xs font-medium ${mapping.mapping_status === 'mapped' ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300' :
+                                  mapping.mapping_status === 'conflict' ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300' :
+                                    'bg-neutral-100 text-neutral-600 dark:bg-neutral-700 dark:text-neutral-400'
+                                }`}>
+                                {mapping.mapping_status}
+                              </span>
+                            )}
                           </td>
                           <td className="px-4 py-3">
                             {mapping.mapping_status === 'conflict' && (
