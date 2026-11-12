@@ -19,6 +19,7 @@ import CityCategoryAnalysisAuditCard from '@/components/marketing-ops/CityCatego
 import CityAnalysisAuditCard from '@/components/marketing-ops/CityAnalysisAuditCard';
 import BusinessAnalysisAuditCard from '@/components/marketing-ops/BusinessAnalysisAuditCard';
 import WebsitePositioningAuditCard from '@/components/marketing-ops/WebsitePositioningAuditCard';
+import EngagementBriefAuditCard from '@/components/marketing-ops/EngagementBriefAuditCard';
 import WebsiteGapBriefingPanel from '@/components/marketing-ops/WebsiteGapBriefingPanel';
 import WebsiteBuildExecutionCard from '@/components/marketing-ops/WebsiteBuildExecutionCard';
 import ArchetypeBriefingPanel from '@/components/marketing-ops/ArchetypeBriefingPanel';
@@ -2247,6 +2248,8 @@ export default function CampaignDetailClient({
                           campaignScope={campaign.scope}
                           onSynced={fetchCampaign}
                         />
+                      ) : audit.platform === 'engagement_brief' && audit.audit_data ? (
+                        <EngagementBriefAuditCard key={audit.id} audit={audit} campaignId={campaignId} />
                       ) : audit.platform === 'gold_standard_scan' && audit.audit_data ? (
                         <div key={audit.id} className="border border-amber-200 dark:border-amber-700 rounded-lg p-4 bg-amber-50/50 dark:bg-amber-900/10">
                           <div className="flex items-center justify-between mb-2">
