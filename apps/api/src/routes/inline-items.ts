@@ -85,6 +85,7 @@ router.get("/api/items/complete", authenticateToken, checkTenantAccess, async (r
           category_path: true,
           directory_category_id: true,
           item_status: true,
+          source: true,
           availability: true,
           has_variants: true,
           product_type: true,

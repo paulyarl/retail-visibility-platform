@@ -31,6 +31,8 @@ export interface Item {
   itemStatus?: 'active' | 'inactive' | 'archived' | 'draft' | 'syncing' | 'trashed'; // Backend field name
   item_status?: 'active' | 'inactive' | 'archived' | 'draft' | 'syncing' | 'trashed'; // Snake case version for backend
   visibility: 'public' | 'private';
+  /** How the item entered the catalog — 'MANUAL' | 'API_IMPORT' | 'CLOVER_DEMO' | … */
+  source?: string;
   categoryPath?: string[];
   category_path?: string[]; // Snake case alias
   tenantCategoryId?: string | null;

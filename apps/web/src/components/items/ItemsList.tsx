@@ -229,6 +229,11 @@ export default function ItemsList({
                       <Badge variant={item.visibility === 'public' ? 'info' : 'default'}>
                         {item.visibility}
                       </Badge>
+                      {item.source === 'CLOVER_DEMO' && (
+                        <span title="Demo overlay sample — never syncs to Clover, Google, or your storefront">
+                          <Badge variant="warning">Demo</Badge>
+                        </span>
+                      )}
                     </div>
                     {/* Sync Status - right next to badges */}
                     <SyncStatusIndicator 
