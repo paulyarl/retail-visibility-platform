@@ -225,6 +225,9 @@ listing structure is the template to work from.
   blog plus POS-partner co-marketing, not the listing alone.
 - Social proof: a merchant testimonial in the listing.
 - Setup claim: *"It takes less than a minute to get set up."*
+- Latency (their own support doc): products *"should show on your Business
+  Profile within 2 weeks."* A black-box batch pipeline vs our ~15-minute poll
+  + Sync Now — a concrete, citable speed claim we can make honestly.
 
 **The eight patterns to copy**
 
@@ -371,7 +374,7 @@ plan table).
 
 **App name** (≤126 chars):
 ```
-VisibleShelf — Clover Inventory to Google Search & Maps
+VisibleShelf — Local Inventory Sync
 ```
 
 **Tagline** (≤255 chars):
@@ -400,7 +403,7 @@ entirely, and the field truncates past ~2.5-3K chars so this compressed
 variant (≈1.8K, PRICING placed early enough to survive truncation) is what to
 paste — exactly this):
 ```
-WHAT IT DOES — VisibleShelf connects your Clover register to Google Maps, Google Search, and your own online storefront. Stock and prices stay current automatically, so shoppers nearby see your real shelf.
+WHAT IT DOES — VisibleShelf syncs your Clover inventory to Google Merchant Center, so your local inventory can appear on Google Search, Maps, and See What's In Store — plus your own online storefront. Stock and prices stay current automatically, so shoppers nearby see your real shelf.
 
 WHY IT EXISTS — Clover items carry no photos, and the Google inventory app only surfaces products with manufacturer barcodes. House brands, bulk goods, anything without a UPC — they never appear. When a barcode does match, the published record belongs to the manufacturer: their name, their image, their description.
 
@@ -414,7 +417,7 @@ BEYOND THE REGISTER — Platform-only items — special orders, services, not-ye
 
 PRICING — Connecting Clover and syncing inventory is free. Presentation features — photos, descriptions, platform-only items, storefront publishing — are part of VisibleShelf plans with a free trial; see visibleshelf.com for current plans. Cancel any time; disconnecting removes your access tokens.
 
-WHAT YOU NEED — A Clover account with the Inventory module and a verified Google Business Profile.
+WHAT YOU NEED — A Clover account with the Inventory module and a verified Google Business Profile (we connect through Google Merchant Center; no ad spend required).
 
 HOW IT WORKS — Connect, automatic sync every 15 minutes, live. We never write back to your register.
 ```
@@ -463,7 +466,7 @@ it is the thing Pointy cannot do for a non-barcoded item.
 | Permissions justification | **Done** — code requests Inventory **Read** + Merchant **Read** only (§7.2). Re-verify the consent screen on next reinstall. |
 | Launch path | **Done** — bound merchants route to their tenant; unbound route into the `clover_market` signup lane → tenant creation → auto-OAuth → GMC chain (§7.1). `client_id` validated. |
 | Reviewer enablement | **Drafted** — how-to-test steps in §9.4 (no credentials needed; reviewers use Clover's own test merchant). Functional video scripted in `CLOVER_FUNCTIONAL_VIDEO_SCRIPT.md` — still needs recording + unlisted upload. |
-| App name | **Settled (v8): `VisibleShelf — Clover Inventory to Google Search & Maps`** (55 chars — Clover dashboard confirmed the field allows 126). Supersedes `VisibleShelf — Local Inventory Sync`; names the source→destination surface instead of the generic pipe. |
+| App name | **Settled (v10): `VisibleShelf — Local Inventory Sync`** (35 chars). Both "Clover" and "Google" are out of the title. "Clover" is redundant inside Clover's own market; "Google" is reserved by convention — an empirical search of the market (query "google" → 8 results) found **zero** third-party apps with it in the name (only Google's own `Local Inventory by Google`), while every result — SocialNow, Local Reviews, Menufy — matched via *description copy*. That same test proved market search indexes copy, so the "google" keyword lives in the tagline/description instead, where precedent is airtight (Pointy's own listing writes "Google Search, Maps, and the Shopping tab"). "Local" is the safe category keyword — Google's app surfaced for the query "local," and apps like `Local Reviews`/`TAPLocal` confirm third-party use. `Local Inventory by Google` is their name shape — do not mirror it. |
 | Categories | **Settled:** Inventory Management (functional), Retail (vertical). |
 
 ## 6. Configuration decisions
@@ -475,7 +478,7 @@ it is the thing Pointy cannot do for a non-barcoded item.
 | 6.1 | Pricing model | Free listing + 14-day trial auto-granted on install (`TRIAL_DURATION_DAYS = 14`; mechanism per §6.7) |
 | 6.2 | Merchant availability | All Clover plans |
 | 6.3 | Categories / positioning | Inventory Management + Retail; product visibility connector |
-| 6.4 | App name | `VisibleShelf — Clover Inventory to Google Search & Maps` (v8 — SWIS destination named; "See What's In Store" stays out of the title to avoid implied-endorsement flags) |
+| 6.4 | App name | `VisibleShelf — Local Inventory Sync` (v10 — no "Clover" (redundant in-market), no "Google" (only Google's own apps use it in names; keyword covered by copy — market search indexes description text). "See What's In Store" stays out for the same implied-endorsement reason) |
 | 6.5 | Fresh-install destination | New-tenant registration flow → integration-capability-aware tier |
 
 ### 6.6 REOPENED — trial expiry
