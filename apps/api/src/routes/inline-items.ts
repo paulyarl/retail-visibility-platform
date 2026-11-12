@@ -170,7 +170,10 @@ router.put('/api/items/:itemId', authenticateToken, requireWritableSubscription,
     }
     if (updateData.description !== undefined) prismaUpdateData.description = updateData.description;
     if (updateData.visibility !== undefined) prismaUpdateData.visibility = updateData.visibility;
-    if (updateData.item_status !== undefined) prismaUpdateData.item_status = updateData.item_status;
+    // Accept both snake and camel: the web client sends `itemStatus`
+    // (Item type), older callers send `item_status`.
+    const itemStatus = updateData.item_status ?? updateData.itemStatus;
+    if (itemStatus !== undefined) prismaUpdateData.item_status = itemStatus;
     if (updateData.category_path !== undefined) prismaUpdateData.category_path = updateData.category_path;
 
     const updatedItem = await prisma.inventory_items.update({
