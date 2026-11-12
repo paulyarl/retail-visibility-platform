@@ -453,8 +453,12 @@ export async function syncIntegration(integration: {
           || cloverItemById.has(m.clover_item_id)) continue;
       const archivedItem = await prisma.inventory_items.findUnique({
         where: { id: m.rvp_item_id },
-        select: { name: true, sku: true },
+        select: { name: true, sku: true, item_status: true },
       });
+      // Idempotence: an item archived on an earlier poll (or by the merchant)
+      // must not re-archive and re-log on every subsequent run — otherwise the
+      // History tab fills with duplicate 'archived' rows every 15 minutes.
+      if (!archivedItem || archivedItem.item_status === 'archived') continue;
       await prisma.inventory_items.update({
         where: { id: m.rvp_item_id },
         data: { item_status: 'archived', updated_at: new Date() },

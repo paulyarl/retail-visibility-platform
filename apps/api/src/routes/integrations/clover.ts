@@ -2363,8 +2363,11 @@ router.post('/:tenantId/clover/sync', authenticateToken, checkTenantAccess, requ
       for (const stale of staleMappings) {
         const staleItem = await prisma.inventory_items.findUnique({
           where: { id: stale.rvp_item_id! },
-          select: { name: true, sku: true }
+          select: { name: true, sku: true, item_status: true }
         });
+        // Idempotence: already-archived items must not re-log on every sync —
+        // manual Sync Now would spam the History tab with duplicate rows.
+        if (!staleItem || staleItem.item_status === 'archived') continue;
         await prisma.inventory_items.update({
           where: { id: stale.rvp_item_id! },
           data: { item_status: 'archived', updated_at: new Date() }
