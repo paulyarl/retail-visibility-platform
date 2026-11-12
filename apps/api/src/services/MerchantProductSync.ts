@@ -15,6 +15,7 @@
  */
 
 import { prisma } from '../prisma';
+import { getTierGmcEgressLimit } from './TierService';
 import { getEffectivePlatform } from '../utils/effectiveFlags';
 import { canonicalStorefrontBaseUrl, resolveStorefrontCanonical } from '../lib/storefront-url';
 import { validateProductForGMC } from './GMCValidationService';
@@ -367,7 +368,29 @@ export async function batchSyncToMerchant(tenantId: string, itemIds?: string[]):
     };
     if (itemIds?.length) whereClause.id = { in: itemIds };
 
-    const items = await prisma.inventory_items.findMany({ where: whereClause, take: 1000 });
+    // Tier egress cap (migration 380): the feed is the metered direction.
+    // 0 → no egress at all; N → the catalog's first N eligible items (stable
+    // sku order — a nondeterministic top-N would churn feed membership on
+    // every run). Explicit itemIds selections are bounded by the same cap.
+    const tenant = await prisma.tenants.findUnique({
+      where: { id: tenantId },
+      select: { subscription_tier: true },
+    });
+    const egressCap = tenant?.subscription_tier
+      ? await getTierGmcEgressLimit(tenant.subscription_tier).catch(() => Infinity)
+      : Infinity;
+    if (egressCap <= 0) {
+      return {
+        success: false, total: 0, synced: 0, failed: 0,
+        results: [{ success: false, productId: '', offerId: '', error: 'gmc_egress_limit_zero' }],
+      };
+    }
+
+    const items = await prisma.inventory_items.findMany({
+      where: whereClause,
+      orderBy: { sku: 'asc' },
+      take: Math.min(1000, egressCap),
+    });
     if (items.length === 0) return { success: true, total: 0, synced: 0, failed: 0, results: [] };
 
     const websiteUrl = await resolveWebsiteUrl(tenantId);

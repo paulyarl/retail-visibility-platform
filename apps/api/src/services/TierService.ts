@@ -63,6 +63,8 @@ interface TierWithFeatures {
   price_monthly: number;
   max_skus: number | null;
   max_locations: number | null;
+  pos_ingress_max_skus: number | null;
+  gmc_egress_max_skus: number | null;
   tier_type: string;
   is_active: boolean;
   sort_order: number;
@@ -106,6 +108,8 @@ async function loadTiers(): Promise<Map<string, TierWithFeatures>> {
       price_monthly: Number(tier.price_monthly),
       max_skus: tier.max_skus,
       max_locations: tier.max_locations,
+      pos_ingress_max_skus: tier.pos_ingress_max_skus ?? null,
+      gmc_egress_max_skus: tier.gmc_egress_max_skus ?? null,
       tier_type: tier.tier_type,
       is_active: tier.is_active,
       sort_order: tier.sort_order,
@@ -217,6 +221,31 @@ export async function getTierSKULimit(tierKey: string): Promise<number> {
   
   // Use base tier's actual limit (ignore trial tier's stored value)
   return tier.max_skus ?? 500;
+}
+
+/**
+ * Get the GMC egress SKU cap for a tier (migration 380 semantics):
+ *   null  → Infinity (uncapped — feed bounded only by catalog size)
+ *   0     → 0 (no egress — tenant's items never reach the feed)
+ *   N     → top-N of the eligible catalog
+ * Trial tiers proxy to their base tier, same as getTierSKULimit.
+ */
+export async function getTierGmcEgressLimit(tierKey: string): Promise<number> {
+  const baseTierKey = getBaseTierForTrial(tierKey);
+  const tier = await getTierByKey(baseTierKey || tierKey);
+  if (!tier) return Infinity;
+  return tier.gmc_egress_max_skus ?? Infinity;
+}
+
+/**
+ * Get the POS ingress SKU cap for a tier. NULL in the DB means "inherit
+ * max_skus" — flat ingress across tiers today.
+ */
+export async function getTierPosIngressLimit(tierKey: string): Promise<number> {
+  const baseTierKey = getBaseTierForTrial(tierKey);
+  const tier = await getTierByKey(baseTierKey || tierKey);
+  if (!tier) return 500;
+  return tier.pos_ingress_max_skus ?? tier.max_skus ?? 500;
 }
 
 /**
