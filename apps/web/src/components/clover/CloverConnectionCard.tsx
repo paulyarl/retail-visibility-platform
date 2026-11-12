@@ -307,7 +307,10 @@ export function CloverConnectionCard({
 
             {showActions && (
               <div className="flex gap-2 flex-wrap">
-                {onSync && (
+                {/* Sync Now hidden under the demo overlay — the sandbox
+                    surface shouldn't fire live register syncs; the scheduled
+                    poll keeps production fresh during the test drive. */}
+                {onSync && !demoActive && (
                   <Button
                     variant="gradient"
                     style={{ color: 'white' }}

@@ -612,19 +612,24 @@ export default function CloverIntegrationPage() {
 
               {/* Actions */}
               <div className="flex flex-wrap gap-3">
-                {/* Production: Sync Now + demo overlay toggle */}
+                {/* Production: Sync Now + demo overlay toggle. Sync Now is
+                    suppressed while the demo overlay is on — a sandbox surface
+                    shouldn't fire live register syncs; the scheduled poll keeps
+                    production truth fresh during the test drive. */}
                 {status.mode === 'production' && (
                   <>
-                    <Button
-                      onClick={handleSync}
-                      variant="gradient"
-                      style={{ color: 'white' }}
-                      disabled={actionLoading}
-                      className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 font-medium flex items-center gap-2"
-                    >
-                      <RefreshCw className={`w-4 h-4 ${actionLoading ? 'animate-spin' : ''}`} />
-                      Sync Now
-                    </Button>
+                    {!status.demoActive && (
+                      <Button
+                        onClick={handleSync}
+                        variant="gradient"
+                        style={{ color: 'white' }}
+                        disabled={actionLoading}
+                        className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 font-medium flex items-center gap-2"
+                      >
+                        <RefreshCw className={`w-4 h-4 ${actionLoading ? 'animate-spin' : ''}`} />
+                        Sync Now
+                      </Button>
+                    )}
                     <Button
                       onClick={status.demoActive ? handleDisableDemo : handleEnableDemo}
                       disabled={actionLoading}
