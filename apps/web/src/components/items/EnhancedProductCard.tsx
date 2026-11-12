@@ -160,9 +160,16 @@ export default function EnhancedProductCard({
         {/* Header with Status and Selection */}
         <div className="flex items-start justify-between mb-3">
           {/* Status Badge */}
-          <div className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium border ${statusConfig.color}`}>
-            <StatusIcon className="w-3 h-3" />
-            {statusConfig.label}
+          <div className="flex items-center gap-1.5">
+            <div className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium border ${statusConfig.color}`}>
+              <StatusIcon className="w-3 h-3" />
+              {statusConfig.label}
+            </div>
+            {item.source === 'CLOVER_DEMO' && (
+              <span title="Demo overlay sample — never syncs to Clover, Google, or your storefront">
+                <Badge variant="warning">Demo</Badge>
+              </span>
+            )}
           </div>
 
           {/* Selection Checkbox for Bulk Mode */}

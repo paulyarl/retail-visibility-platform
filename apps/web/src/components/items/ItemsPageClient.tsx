@@ -11,6 +11,7 @@ import { useAccessControl, AccessPresets } from "@/lib/auth/useAccessControl";
 import { useProductTypeCapability } from "@/hooks/tenant-access/useCapabilityAccess";
 import StoreInventoryHeader from "@/components/items/StoreInventoryHeader";
 import FlyerItemHint from "@/components/items/FlyerItemHint";
+import DemoOverlayBanner from "@/components/items/DemoOverlayBanner";
 import ItemsPagination from "@/components/items/ItemsPagination";
 import ItemsGrid from "@/components/items/ItemsGrid";
 import ItemsList from "@/components/items/ItemsList";
@@ -529,6 +530,7 @@ export default function ItemsPageClient({ tenantId }: ItemsPageClientProps) {
 
       {/* Filters */}
       <div className="max-w-7xl mx-auto px-4 space-y-3">
+        <DemoOverlayBanner tenantId={tenantId} />
         <FlyerItemHint tenantId={tenantId} />
         <div className="flex gap-2">
           <Input
