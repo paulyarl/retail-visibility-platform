@@ -36,6 +36,10 @@ export interface TierSystemTier {
   priceMonthly: number;
   maxSkus: number | null;
   maxLocations: number | null;
+  /** POS ingress cap — null inherits max_skus (flat ingress). */
+  posIngressMaxSkus: number | null;
+  /** GMC feed cap — null uncapped, 0 = no egress, N = top-N items. */
+  gmcEgressMaxSkus: number | null;
   tierType: string;
   isActive: boolean;
   sortOrder: number;

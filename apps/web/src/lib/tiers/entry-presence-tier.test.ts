@@ -94,8 +94,8 @@ describe('V3.1 Entry Presence tier feature maps', () => {
       expect(TIER_DISPLAY_NAMES.storefront).toBe('Storefront+');
     });
 
-    it('is priced at $39/month', () => {
-      expect(TIER_PRICING.presence).toBe(39);
+    it('is priced at $29/month', () => {
+      expect(TIER_PRICING.presence).toBe(29);
     });
   });
 

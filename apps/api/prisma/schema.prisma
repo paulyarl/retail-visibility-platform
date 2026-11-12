@@ -6290,6 +6290,8 @@ model subscription_tiers_list {
   price_monthly            Decimal                    @db.Decimal(10, 2)
   max_skus                 Int?
   max_locations            Int?
+  pos_ingress_max_skus     Int?
+  gmc_egress_max_skus      Int?
   tier_type                String                     @default("individual")
   is_active                Boolean                    @default(true)
   sort_order               Int                        @default(0)

@@ -80,6 +80,8 @@ async function transformTier(tier: any) {
     priceMonthly: numericPrice,
     maxSkus: tier.max_skus,
     maxLocations: tier.max_locations,
+    posIngressMaxSkus: (tier as any).pos_ingress_max_skus ?? null,
+    gmcEgressMaxSkus: (tier as any).gmc_egress_max_skus ?? null,
     tierType: tier.tier_type,
     isActive: tier.is_active,
     sortOrder: tier.sort_order,
@@ -294,6 +296,7 @@ router.get('/tiers/:tierId', requirePlatformStaff, async (req, res) => {
  * Access: Platform admin only
  */
 const createTierSchema = z.object({
+  // NOTE: keep field parity with updateTierSchema below
   tierKey: z.string().min(1).regex(/^[a-z_]+$/, 'Tier key must be lowercase with underscores'),
   name: z.string().min(1),
   displayName: z.string().min(1),
@@ -301,6 +304,8 @@ const createTierSchema = z.object({
   priceMonthly: z.number().min(0), // Allow decimals for prices
   maxSkus: z.number().int().positive().nullable().optional(),
   maxLocations: z.number().int().positive().nullable().optional(),
+  posIngressMaxSkus: z.number().int().positive().nullable().optional(),
+  gmcEgressMaxSkus: z.number().int().min(0).nullable().optional(),
   tierType: z.enum(['individual', 'organization']).default('individual'),
   sortOrder: z.number().int().min(0).default(0),
   metadata: z.any().optional(),
@@ -347,6 +352,8 @@ router.post('/tiers', requirePlatformAdmin, async (req, res) => {
       price_monthly: tierData.priceMonthly,
       max_skus: tierData.maxSkus ?? null,
       max_locations: tierData.maxLocations ?? null,
+      pos_ingress_max_skus: tierData.posIngressMaxSkus ?? null,
+      gmc_egress_max_skus: tierData.gmcEgressMaxSkus ?? null,
       tier_type: tierData.tierType,
       sort_order: tierData.sortOrder,
       metadata: tierData.metadata as any,
@@ -414,6 +421,10 @@ const updateTierSchema = z.object({
   priceMonthly: z.number().min(0).optional(), // Allow decimals for prices
   maxSkus: z.number().int().positive().nullable().optional(),
   maxLocations: z.number().int().positive().nullable().optional(),
+  // Separated integration limits (migration 380): NULL = unconstrained by
+  // this dimension, 0 = deny, N = cap. gmc allows 0 explicitly.
+  posIngressMaxSkus: z.number().int().positive().nullable().optional(),
+  gmcEgressMaxSkus: z.number().int().min(0).nullable().optional(),
   tierType: z.enum(['individual', 'organization']).optional(),
   isActive: z.boolean().optional(),
   sortOrder: z.number().int().min(0).optional(),
@@ -464,6 +475,8 @@ router.patch('/tiers/:tierId', requirePlatformAdmin, async (req, res) => {
     if (updateData.priceMonthly !== undefined) dbUpdateData.price_monthly = updateData.priceMonthly;
     if (updateData.maxSkus !== undefined) dbUpdateData.max_skus = updateData.maxSkus;
     if (updateData.maxLocations !== undefined) dbUpdateData.max_locations = updateData.maxLocations;
+    if (updateData.posIngressMaxSkus !== undefined) dbUpdateData.pos_ingress_max_skus = updateData.posIngressMaxSkus;
+    if (updateData.gmcEgressMaxSkus !== undefined) dbUpdateData.gmc_egress_max_skus = updateData.gmcEgressMaxSkus;
     if (updateData.tierType !== undefined) dbUpdateData.tier_type = updateData.tierType;
     if (updateData.isActive !== undefined) dbUpdateData.is_active = updateData.isActive;
     if (updateData.sortOrder !== undefined) dbUpdateData.sort_order = updateData.sortOrder;
@@ -587,6 +600,8 @@ router.put('/tiers/:tierId', requirePlatformAdmin, async (req, res) => {
     if (updateData.priceMonthly !== undefined) dbUpdateData.price_monthly = updateData.priceMonthly;
     if (updateData.maxSkus !== undefined) dbUpdateData.max_skus = updateData.maxSkus;
     if (updateData.maxLocations !== undefined) dbUpdateData.max_locations = updateData.maxLocations;
+    if (updateData.posIngressMaxSkus !== undefined) dbUpdateData.pos_ingress_max_skus = updateData.posIngressMaxSkus;
+    if (updateData.gmcEgressMaxSkus !== undefined) dbUpdateData.gmc_egress_max_skus = updateData.gmcEgressMaxSkus;
     if (updateData.tierType !== undefined) dbUpdateData.tier_type = updateData.tierType;
     if (updateData.isActive !== undefined) dbUpdateData.is_active = updateData.isActive;
     if (updateData.sortOrder !== undefined) dbUpdateData.sort_order = updateData.sortOrder;

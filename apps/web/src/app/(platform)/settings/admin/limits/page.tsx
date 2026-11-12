@@ -24,7 +24,7 @@ export default function AdminLimitsPage() {
   const [editingLimits, setEditingLimits] = useState<FeaturedProductsLimit | null>(null);
   const [saving, setSaving] = useState(false);
   const [selectedTier, setSelectedTier] = useState<string>('discovery');
-  const [focusedEdit, setFocusedEdit] = useState<{ tierKey: string; field: 'maxLocations' | 'priceMonthly' | 'maxSkus' } | null>(null);
+  const [focusedEdit, setFocusedEdit] = useState<{ tierKey: string; field: 'maxLocations' | 'priceMonthly' | 'maxSkus' | 'posIngressMaxSkus' | 'gmcEgressMaxSkus' } | null>(null);
   const [editValue, setEditValue] = useState('');
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'success' | 'error'>('idle');
   const [lastSavedTier, setLastSavedTier] = useState<string | null>(null);
@@ -301,7 +301,7 @@ export default function AdminLimitsPage() {
       </div>
     );
   };
-  const handleFocusedEdit = (tierKey: string, field: 'maxLocations' | 'priceMonthly' | 'maxSkus', currentValue: string | number | null | undefined) => {
+  const handleFocusedEdit = (tierKey: string, field: 'maxLocations' | 'priceMonthly' | 'maxSkus' | 'posIngressMaxSkus' | 'gmcEgressMaxSkus', currentValue: string | number | null | undefined) => {
     setFocusedEdit({ tierKey, field });
     
     // Handle Infinity case for max locations
@@ -317,7 +317,7 @@ export default function AdminLimitsPage() {
     setEditValue('');
   };
 
-  const handleFocusedSave = async (tierKey: string, field: 'maxLocations' | 'priceMonthly' | 'maxSkus') => {
+  const handleFocusedSave = async (tierKey: string, field: 'maxLocations' | 'priceMonthly' | 'maxSkus' | 'posIngressMaxSkus' | 'gmcEgressMaxSkus') => {
     try {
       // console.log(`[FocusedSave] Starting save for tier: ${tierKey}, field: ${field}`);
       // console.log(`[FocusedSave] Current editValue: "${editValue}"`);
@@ -329,7 +329,7 @@ export default function AdminLimitsPage() {
       let updateValue: any;
       if (field === 'priceMonthly') {
         updateValue = parseInt(editValue) || 0;
-      } else if (field === 'maxSkus') {
+      } else if (field === 'maxSkus' || field === 'posIngressMaxSkus' || field === 'gmcEgressMaxSkus') {
         updateValue = editValue === '' ? null : parseInt(editValue) || 0;
       } else if (field === 'maxLocations') {
         updateValue = parseInt(editValue) || 0;
@@ -485,7 +485,9 @@ export default function AdminLimitsPage() {
         sortOrder: tier.sortOrder,
         price: tier.priceMonthly || 0,
         maxSkus: tier.maxSkus,
-        maxLocations: tier.maxLocations
+        maxLocations: tier.maxLocations,
+        posIngressMaxSkus: tier.posIngressMaxSkus,
+        gmcEgressMaxSkus: tier.gmcEgressMaxSkus,
       };
     }).sort((a, b) => a.sortOrder - b.sortOrder);
   };
@@ -522,7 +524,7 @@ export default function AdminLimitsPage() {
               </p>
             </div>
             <div className="grid gap-6">
-              {getEnhancedTierData().map(({ tierKey, config, tierData, isActive, sortOrder, price, maxSkus, maxLocations }) => (
+              {getEnhancedTierData().map(({ tierKey, config, tierData, isActive, sortOrder, price, maxSkus, maxLocations, posIngressMaxSkus, gmcEgressMaxSkus }) => (
                 <div
                   key={tierKey}
                   className={`border rounded-lg p-6 ${
@@ -631,7 +633,7 @@ export default function AdminLimitsPage() {
                       
                       {/* Show additional tier data if available */}
                       {tierData && (
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm mt-3">
+                        <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm mt-3">
                           <div>
                             <span className="font-medium">Price:</span>
                             {focusedEdit?.tierKey === tierKey && focusedEdit?.field === 'priceMonthly' ? (
@@ -786,6 +788,112 @@ export default function AdminLimitsPage() {
                                   onClick={() => handleFocusedEdit(tierKey, 'maxLocations', maxLocations)}
                                   variant="outline"
                                   title="Edit max locations"
+                                  w="auto"
+                                  miw="fit-content"
+                                >
+                                  <Edit2 className="w-4 h-4 mr-1" />
+                                  Edit
+                                </Button>
+                              </div>
+                            )}
+                          </div>
+                          <div>
+                            <span className="font-medium" title="Cap on POS-synced items; empty inherits Max SKUs">POS Ingress:</span>
+                            {focusedEdit?.tierKey === tierKey && focusedEdit?.field === 'posIngressMaxSkus' ? (
+                              <div className="flex items-center gap-2 ml-2">
+                                <Input
+                                  type="number"
+                                  min="0"
+                                  max="999999"
+                                  value={editValue}
+                                  onChange={(e) => setEditValue(e.target.value)}
+                                  className="w-24 px-2 py-1 text-sm"
+                                  placeholder="Inherit"
+                                />
+                                <Button
+                                  onClick={() => handleFocusedSave(tierKey, 'posIngressMaxSkus')}
+                                  disabled={saving}
+                                  variant="default"
+                                  title="Save POS ingress cap"
+                                  w="auto"
+                                  miw="fit-content"
+                                >
+                                  <Save className="w-4 h-4 mr-1" />
+                                  Save
+                                </Button>
+                                <Button
+                                  onClick={handleFocusedCancel}
+                                  variant="outline"
+                                  title="Cancel editing"
+                                  w="auto"
+                                  miw="fit-content"
+                                >
+                                  <X className="w-4 h-4 mr-1" />
+                                  Cancel
+                                </Button>
+                              </div>
+                            ) : (
+                              <div className="flex items-center gap-2 ml-2">
+                                <span className="font-semibold">
+                                  {posIngressMaxSkus === null || posIngressMaxSkus === undefined ? 'Inherit' : posIngressMaxSkus.toLocaleString()}
+                                </span>
+                                <Button
+                                  onClick={() => handleFocusedEdit(tierKey, 'posIngressMaxSkus', posIngressMaxSkus)}
+                                  variant="outline"
+                                  title="Edit POS ingress cap (empty = inherit catalog cap)"
+                                  w="auto"
+                                  miw="fit-content"
+                                >
+                                  <Edit2 className="w-4 h-4 mr-1" />
+                                  Edit
+                                </Button>
+                              </div>
+                            )}
+                          </div>
+                          <div>
+                            <span className="font-medium" title="Cap on items pushed to the Google feed; 0 = no egress, empty = uncapped">GMC Egress:</span>
+                            {focusedEdit?.tierKey === tierKey && focusedEdit?.field === 'gmcEgressMaxSkus' ? (
+                              <div className="flex items-center gap-2 ml-2">
+                                <Input
+                                  type="number"
+                                  min="0"
+                                  max="999999"
+                                  value={editValue}
+                                  onChange={(e) => setEditValue(e.target.value)}
+                                  className="w-24 px-2 py-1 text-sm"
+                                  placeholder="Uncapped"
+                                />
+                                <Button
+                                  onClick={() => handleFocusedSave(tierKey, 'gmcEgressMaxSkus')}
+                                  disabled={saving}
+                                  variant="default"
+                                  title="Save GMC egress cap"
+                                  w="auto"
+                                  miw="fit-content"
+                                >
+                                  <Save className="w-4 h-4 mr-1" />
+                                  Save
+                                </Button>
+                                <Button
+                                  onClick={handleFocusedCancel}
+                                  variant="outline"
+                                  title="Cancel editing"
+                                  w="auto"
+                                  miw="fit-content"
+                                >
+                                  <X className="w-4 h-4 mr-1" />
+                                  Cancel
+                                </Button>
+                              </div>
+                            ) : (
+                              <div className="flex items-center gap-2 ml-2">
+                                <span className="font-semibold">
+                                  {gmcEgressMaxSkus === null || gmcEgressMaxSkus === undefined ? 'Uncapped' : gmcEgressMaxSkus === 0 ? 'None' : gmcEgressMaxSkus.toLocaleString()}
+                                </span>
+                                <Button
+                                  onClick={() => handleFocusedEdit(tierKey, 'gmcEgressMaxSkus', gmcEgressMaxSkus)}
+                                  variant="outline"
+                                  title="Edit GMC egress cap (0 = no egress, empty = uncapped)"
                                   w="auto"
                                   miw="fit-content"
                                 >

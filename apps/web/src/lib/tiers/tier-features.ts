@@ -384,7 +384,7 @@ export const FEATURE_DISPLAY_NAMES: Record<string, string> = {
 export const TIER_PRICING: Record<string, number> = {
   google_only: 29,
   directory_presence: 0,
-  presence: 39,
+  presence: 29,
   discovery: 29,
   storefront: 59,
   commitment: 79,  // V2 pricing

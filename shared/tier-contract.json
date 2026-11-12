@@ -67,7 +67,7 @@
   "pricing": {
     "$comment": "0.4 is unresolved: the doc table lacks the `chain_*` / `google_only` / `trial` / `starter` rows that exist in code, and Phase 5.1's doc generation is gated on that decision. Only the documented active-tier prices are pinned here; the dormant rows are deliberately absent until 0.4 rules.",
     "directory_presence": 0,
-    "presence": 39,
+    "presence": 29,
     "discovery": 29,
     "storefront": 59,
     "commitment": 79,
@@ -509,7 +509,7 @@
     }
   },
   "capability_modules": {
-    "$comment": "Generated from the DB witness (scripts/sync-fixture-modules.cjs — do NOT hand-edit). Source: shared/tier-contract-db-witness.json (env=prd, generated_at=2026-11-11T13:02:16.025Z). tier-db-witness.test.ts asserts this block === witness.capability_features.",
+    "$comment": "Generated from the DB witness (scripts/sync-fixture-modules.cjs — do NOT hand-edit). Source: shared/tier-contract-db-witness.json (env=prd, generated_at=2026-11-12T12:13:34.873Z). tier-db-witness.test.ts asserts this block === witness.capability_features.",
     "barcode_scan_options": [
       "barcode_camera",
       "barcode_disabled",
