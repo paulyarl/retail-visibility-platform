@@ -176,7 +176,9 @@ export function CloverConnectionCard({
               This workspace was connected to a Clover merchant account. Reconnect to resume syncing your real inventory — or flip on demo mode for a non-destructive test drive in the meantime.
             </p>
             <div className="flex gap-2">
-              {onConnect && showActions && (
+              {/* Reconnect hidden under an active overlay — exit the demo
+                  first so the connection lifecycle stays in one order. */}
+              {onConnect && showActions && !demoActive && (
                 <Button
                   variant="gradient"
                   style={{ color: 'white' }}
@@ -343,7 +345,7 @@ export function CloverConnectionCard({
                   <Settings className="h-4 w-4 mr-2" />
                   Settings
                 </Button>
-                {onDisconnect && (
+                {onDisconnect && !demoActive && (
                   <Button
                     variant="gradient"
                     style={{ color: 'white' }}
