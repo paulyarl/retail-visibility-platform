@@ -673,8 +673,11 @@ export default function CloverIntegrationPage() {
                   </>
                 )}
 
-                {/* Production: Disconnect */}
-                {status.mode === 'production' && (
+                {/* Production: Disconnect — hidden while the demo overlay is
+                    on. The overlay owns the connection lifecycle: exiting the
+                    sandbox first keeps teardown clean and prevents orphaning
+                    demo rows on a disconnected integration. */}
+                {status.mode === 'production' && !status.demoActive && (
                   <Button
                     onClick={handleDisconnect}
                     disabled={actionLoading}
