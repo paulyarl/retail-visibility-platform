@@ -3,7 +3,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 vi.mock('../MarketingReceiptPdfService', async (importOriginal) => ({
   ...((await importOriginal()) as Record<string, unknown>),
   loadPlatformBranding: vi.fn(async () => ({
-    platformName: 'Visible Shelf',
+    platformName: 'VisibleShelf',
     primaryColor: '#0f766e',
     contactEmail: 'hello@visibleshelf.example',
     contactWebsite: 'https://visibleshelf.example',

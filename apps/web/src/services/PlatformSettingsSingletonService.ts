@@ -105,7 +105,7 @@ class PlatformSettingsSingletonService extends PublicApiSingleton {
       
       // Return default settings if no data
       return {
-        platformName: 'VisibleShelf LLC',
+        platformName: 'VisibleShelf',
         platformDescription: '',
         logoUrl: null,
         faviconUrl: null,
@@ -141,7 +141,7 @@ class PlatformSettingsSingletonService extends PublicApiSingleton {
       
       // Return default settings on error
       return {
-        platformName: 'VisibleShelf LLC',
+        platformName: 'VisibleShelf',
         platformDescription: '',
         logoUrl: null,
         faviconUrl: null,
