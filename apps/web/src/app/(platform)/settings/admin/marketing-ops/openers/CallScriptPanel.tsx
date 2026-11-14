@@ -537,6 +537,10 @@ export default function CallScriptPanel({ campaignId, campaignPhone, onLogCall }
   const { stages, hookOptions, objections, callContext, anchor } = script;
   const ammunition = script.ammunition ?? [];
   const benefits = script.benefits ?? [];
+  // do_not_claim guardrails ride the spine-sourced ammunition (2.6) — the
+  // prohibitions the operator must not speak, rendered as a warning strip
+  // above the ammunition they're scoped to.
+  const guardrails: string[] = (script as any).guardrails ?? [];
   const platformPriorities = callContext?.platform_priorities ?? [];
   const platformPremise = callContext?.platform_premise ?? null;
 
@@ -768,13 +772,25 @@ export default function CallScriptPanel({ campaignId, campaignPhone, onLogCall }
         </div>
       </div>
 
-      {/* Audit ammunition — verbatim problem → hook → fix copy from the
-          campaign's business audit (outreach_problems contract). Operator
-          reference only: the audit's prospect-specific lines sit next to
-          the library hooks instead of in a separate tab. */}
+      {/* Ammunition — spine-ranked problem → hook → fix copy (engagement
+          brief first, audit outreach_problems fallback). Operator
+          reference only: the prospect-specific lines sit next to the
+          library hooks instead of in a separate tab. */}
+      {guardrails.length > 0 && (
+        <div className="rounded-lg border border-red-200 bg-red-50/60 p-3 dark:border-red-800 dark:bg-red-900/10">
+          <p className="text-xs font-semibold uppercase tracking-wide text-red-700 dark:text-red-300">
+            Guardrails — never claim
+          </p>
+          <ul className="mt-1.5 space-y-1">
+            {guardrails.map((g: string, i: number) => (
+              <li key={i} className="text-xs text-red-700 dark:text-red-300">· {g}</li>
+            ))}
+          </ul>
+        </div>
+      )}
       {ammunition.length > 0 && (
         <div className="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-900">
-          <OutreachProblemsSection problems={ammunition} title="Audit ammunition — from the business audit" />
+          <OutreachProblemsSection problems={ammunition} title="Ammunition — ranked play (engagement brief)" />
         </div>
       )}
 

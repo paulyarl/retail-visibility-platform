@@ -1,6 +1,6 @@
 # Engagement Brief Spine — Consolidation & First-Consumer Sprint Plan
 
-**Status:** Phase 1 complete (2026-11-14) — assembler, sibling-pooled source resolution, fingerprint, ref-integrity, schema v2 shipped. Phase 2 next.
+**Status:** All phases shipped (2026-11-14) — the brief is fully consumed. Spine layer (`brief-spine.ts`) resolves persisted→assembled for every consumer; CallScript/seed ammunition, openers, follow-ups, manual scripts, anchors, pitch-construction slots, the card, communications gate resolution, and the follow-up workspace all read the spine with Pass-1 fragments in fallback branches only. Reassemble-on-import + gate carry-over + OQ7 `deprecated_fragments` marker + D7 synthesis gate (`needsSynthesisOverlay`) shipped. checkapi/checkweb clean; 79 tests green (67 api incl. golden Viet Hua ordering, 12 web card).
 **Date:** 2026-11-14
 **Upstream spec:** `docs/AUDIT_CHANNEL_SCAN_AND_OPPORTUNITY_COLLECTION_SPEC.md` (Pass 2 shipped 2026-10-13; OQ7 "judgment migration" remains open — this sprint resolves it)
 **Related:** `docs/LocalBiz/marketing_ops_multi_archetype_campaign_sprint_plan.md` (sibling campaigns — the brief's ranking overlay must be archetype-aware)

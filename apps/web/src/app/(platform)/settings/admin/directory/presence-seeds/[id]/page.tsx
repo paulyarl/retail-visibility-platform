@@ -3604,14 +3604,30 @@ function PresenceSeedDetailClient() {
               ) : null,
             )}
 
-            {/* Audit ammunition — verbatim problem → hook → fix copy from
-                the linked campaign's business audit. Operator reference
-                only; the stage text above stays generic/anchor-driven. */}
+            {/* Guardrails — the linked campaign brief's do_not_claim
+                prohibitions. The claim-motion copy below must not
+                contradict them (2.1a). */}
+            {((seedScript as any).guardrails?.length ?? 0) > 0 && (
+              <div className="border border-red-200 bg-red-50/60 rounded-lg p-3">
+                <p className="text-[10px] font-semibold text-red-700 uppercase tracking-wide">
+                  Guardrails — never claim
+                </p>
+                <ul className="mt-1.5 space-y-1">
+                  {((seedScript as any).guardrails as string[]).map((g, i) => (
+                    <li key={i} className="text-xs text-red-700">· {g}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {/* Ammunition — spine-ranked problem → hook → fix copy from the
+                linked campaign's engagement brief (audit fallback). Operator
+                reference only; the stage text above stays generic/anchor-driven. */}
             {(seedScript.ammunition?.length ?? 0) > 0 && (
               <div className="border border-gray-200 rounded-lg p-3">
                 <OutreachProblemsSection
                   problems={seedScript.ammunition!}
-                  title="Audit ammunition — linked campaign audit"
+                  title="Ammunition — linked campaign brief"
                 />
               </div>
             )}

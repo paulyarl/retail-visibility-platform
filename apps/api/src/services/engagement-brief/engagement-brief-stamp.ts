@@ -238,6 +238,14 @@ export async function applyEngagementBriefStamp<T extends Record<string, any>>(
 
   const fingerprint = computeEvidenceFingerprint(sourceAudit?.audit_data);
 
+  // OQ7 marker — once a brief stamps against this audit, its judgment
+  // fragments (outreach_problems, benefits, primary_outreach_hook) are
+  // spine-owned; the marker lets audit viewers badge them as migrated.
+  if (sourceAudit?.id) {
+    const { markPass1FragmentsConsolidated } = await import('./brief-spine');
+    await markPass1FragmentsConsolidated(opts.prisma, sourceAudit.id).catch(() => {});
+  }
+
   return {
     ...parsedJson,
     brief_version: ENGAGEMENT_BRIEF_VERSION,

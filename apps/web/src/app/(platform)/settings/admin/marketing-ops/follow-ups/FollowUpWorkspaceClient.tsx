@@ -95,15 +95,16 @@ export default function FollowUpWorkspaceClient({ initialCampaignId }: Props) {
 
   const [copied, setCopied] = useState(false);
 
-  // Filter to review-management campaigns only.
-  // Follow-ups build on the review pipeline's opener (A1-A4 archetype +
-  // close_variant). Recovery campaigns have their own outreach cycle
-  // (Day 1/2/4 cascade handled by RecoveryCascadeService) and are
-  // intentionally excluded here. Profile repair campaigns on the standard
-  // track (or in triage) are included — they use the review pipeline.
+  // Eligible campaigns for follow-ups.
+  // Follow-ups build on the review pipeline's opener (archetype +
+  // close_variant) — any campaign that can carry an opener qualifies.
+  // Recovery-pipeline campaigns are included (4.4a): sibling campaigns in
+  // recovery/profile_repair lanes need manual follow-ups alongside the
+  // automated Day 1/2/4 cascade — the operator decides when a manual touch
+  // supplements the cascade.
   const reviewCampaigns = useMemo(
     () => campaigns.filter(
-      (c) => (c as any).pipeline === 'review',
+      (c) => (c as any).pipeline === 'review' || (c as any).pipeline === 'recovery',
     ),
     [campaigns],
   );
@@ -280,7 +281,7 @@ export default function FollowUpWorkspaceClient({ initialCampaignId }: Props) {
     <div className="space-y-6">
       {/* ─── Page header — Review Management only ──────────────────────── */}
       <div className="bg-blue-50 dark:bg-blue-900/20 rounded-xl border border-blue-200 dark:border-blue-800 p-4">
-        <h1 className="text-base font-semibold text-gray-900 dark:text-white">Follow-Ups — Review Management</h1>
+        <h1 className="text-base font-semibold text-gray-900 dark:text-white">Follow-Ups</h1>
         <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
           Follow-up messages for review-management campaigns that didn&apos;t reply to the opener.
           Recovery campaigns use their own outreach cycle (Day 1/2/4 cascade on the Recovery tab).
@@ -290,7 +291,7 @@ export default function FollowUpWorkspaceClient({ initialCampaignId }: Props) {
       {/* ─── Campaign Selector ──────────────────────────────────────────── */}
       <div className="bg-white dark:bg-neutral-800 rounded-xl border border-gray-200 dark:border-neutral-700 p-5">
         <div className="flex items-center justify-between mb-3">
-          <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-300">Select Campaign — Review Management</h2>
+          <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-300">Select Campaign</h2>
           <span className="text-xs text-gray-400 dark:text-gray-500">
             {displayCampaigns.length} campaign{displayCampaigns.length !== 1 ? 's' : ''}
           </span>

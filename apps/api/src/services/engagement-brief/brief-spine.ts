@@ -350,7 +350,46 @@ export async function refreshBriefsAfterAuditImport(
       where: { id: brief.id },
       data: { audit_data: merged },
     });
+    // OQ7 marker — the source audit's judgment fragments are now spine-owned.
+    await markPass1FragmentsConsolidated(prisma, sourceAudit.id).catch(() => {});
     refreshed++;
   }
   return { refreshed, unchanged };
+}
+
+/**
+ * Pass-1 judgment fragments the spine supersedes (OQ7 — the last reader
+ * migrated in the spine sprint). Stamped onto the source audit row as
+ * `deprecated_fragments` so audit viewers can badge the moved blocks; the
+ * fields stay readable in audit_data as the documented fallback lane.
+ */
+export const MIGRATED_JUDGMENT_FRAGMENTS = [
+  'outreach_problems',
+  'benefits',
+  'alignment_scoring.primary_outreach_hook',
+] as const;
+
+/** Stamp the migrated-fragment marker on a Pass-1 audit row (idempotent). */
+export async function markPass1FragmentsConsolidated(
+  prisma: any,
+  auditId: string,
+): Promise<void> {
+  const row = await prisma.mkt_audits_list.findUnique({
+    where: { id: auditId },
+    select: { audit_data: true },
+  });
+  if (!row?.audit_data || (row.audit_data as any).deprecated_fragments) return;
+  await prisma.mkt_audits_list.update({
+    where: { id: auditId },
+    data: {
+      audit_data: {
+        ...row.audit_data,
+        deprecated_fragments: {
+          migrated_to: 'engagement_brief',
+          fields: [...MIGRATED_JUDGMENT_FRAGMENTS],
+          note: 'Judgment fragments consolidated into the engagement-brief spine; these fields remain as the legacy fallback lane.',
+        },
+      },
+    },
+  });
 }

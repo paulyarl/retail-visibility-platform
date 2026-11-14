@@ -20,6 +20,7 @@ import {
   assembleEngagementBrief,
   classifyDomain,
   computeEvidenceFingerprint,
+  needsSynthesisOverlay,
   resolveAuditPath,
   BRIEF_INPUT_FIELDS,
 } from '../brief-assembler';
@@ -377,5 +378,24 @@ describe('classifyDomain', () => {
   it('empty text is other', () => {
     expect(classifyDomain('')).toBe('other');
     expect(classifyDomain(null)).toBe('other');
+  });
+});
+
+describe('needsSynthesisOverlay (D7 spend gate)', () => {
+  const assembledWith = (slots: string[]) => ({
+    assembly_notes: { uncovered_slots: slots },
+  });
+
+  it('gates model synthesis on uncovered slots + high_attention', () => {
+    // No uncovered slots → never spend, even at high attention.
+    expect(needsSynthesisOverlay({ high_attention: true }, assembledWith([]))).toBe(false);
+    // Uncovered slots but ordinary attention → deterministic fold stands.
+    expect(needsSynthesisOverlay({ high_attention: false }, assembledWith(['pains']))).toBe(false);
+    expect(needsSynthesisOverlay({}, assembledWith(['pains']))).toBe(false);
+    // Uncovered slots + high_attention → spend is justified.
+    expect(needsSynthesisOverlay({ high_attention: true }, assembledWith(['pains']))).toBe(true);
+    // Operator refresh is an explicit override.
+    expect(needsSynthesisOverlay({}, assembledWith(['pains']), true)).toBe(true);
+    expect(needsSynthesisOverlay({}, assembledWith([]), true)).toBe(false);
   });
 });

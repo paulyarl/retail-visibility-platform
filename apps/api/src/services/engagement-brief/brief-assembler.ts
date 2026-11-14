@@ -717,3 +717,18 @@ export function assembleEngagementBrief(auditData: any): AssembledBrief {
     },
   };
 }
+
+/**
+ * Layer-C spend gate (D7): model synthesis is reserved for slots the
+ * deterministic fold could not cover AND only when the audit flags
+ * high_attention (or the operator explicitly refreshes, which callers pass
+ * as `operatorRequested`). Everything else is free — the fold re-runs.
+ */
+export function needsSynthesisOverlay(
+  auditData: any,
+  assembled: { assembly_notes?: { uncovered_slots?: string[] } },
+  operatorRequested = false,
+): boolean {
+  const uncovered = assembled.assembly_notes?.uncovered_slots?.length ?? 0;
+  return uncovered > 0 && (auditData?.high_attention === true || operatorRequested);
+}
