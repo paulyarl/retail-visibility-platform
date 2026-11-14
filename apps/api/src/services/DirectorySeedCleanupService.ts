@@ -36,7 +36,9 @@
  *       attributes mined from the linked queue entry's business_snapshot,
  *       then SEO per-seed through getComposedEnrichment — the same
  *       campaign/market compose lanes Reset uses, but fill-missing only
- *       (Reset is the overwrite path).
+ *       (Reset is the overwrite path). Both bulk writers — backfill and
+ *       recompose — only touch draft/published seeds; invited (live claim
+ *       link outstanding), claimed and suppressed are skipped.
  */
 
 import { prisma } from '../prisma';
@@ -792,7 +794,10 @@ class DirectorySeedCleanupService {
         skipped.push({ seedId, reason: 'seed_not_found' });
         continue;
       }
-      if (seed.status === 'claimed' || seed.status === 'suppressed') {
+      // Only operator-editable states may be rewritten — invited means a
+      // claim link is already in the business's hands, claimed is a real
+      // customer, suppressed is retired.
+      if (seed.status !== 'draft' && seed.status !== 'published') {
         skipped.push({ seedId, reason: `status_${seed.status}` });
         continue;
       }
@@ -932,8 +937,10 @@ class DirectorySeedCleanupService {
         results.push({ seedId, skipped: 'seed_not_found' });
         continue;
       }
-      if (s.status === 'claimed' || s.status === 'suppressed') {
-        // Mirrors the resharpen/promote guards — owner-managed or retired.
+      if (s.status !== 'draft' && s.status !== 'published') {
+        // Mirrors the resharpen/promote guards — owner-managed (claimed),
+        // in-flight invite (invited), or retired (suppressed). Bulk writes
+        // wait for the claim to resolve one way or the other.
         results.push({ seedId, skipped: `status_${s.status}` });
         continue;
       }
