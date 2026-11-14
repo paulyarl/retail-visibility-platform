@@ -165,6 +165,64 @@ describe('engagementBriefSchema', () => {
   });
 });
 
+describe('engagement_brief v2 fields (D8 — backward-compatible)', () => {
+  it('accepts a v1 payload with none of the v2 fields present', () => {
+    expect(engagementBriefSchema.safeParse(VALID_BRIEF).success).toBe(true);
+  });
+
+  it('accepts assembler-emitted v2 fields on spine rows and root', () => {
+    const r = engagementBriefSchema.safeParse({
+      ...VALID_BRIEF,
+      brief_version: 2,
+      evidence_fingerprint: 'a1b2c3',
+      staleness: 'current',
+      assembly: 'deterministic',
+      archetype_domain: 'review',
+      ref_integrity: { broken: ['w9'] },
+      pains: [
+        {
+          ...VALID_BRIEF.pains[0],
+          source_fragment: 'gap_analysis.gaps[0]',
+          supporting_refs: ['p1s1'],
+          domain: 'review',
+          regular: 'plain line',
+          hook: 'hook line',
+          fix: 'fix summary',
+          reconciliation_notes: ['merged with gap_analysis.gaps[0]'],
+          provenance_broken: true,
+        },
+      ],
+      verification_gates: [
+        {
+          gate: 'Confirm EBT acceptance',
+          blocks: 'p1',
+          who_can_answer: 'owner',
+          status: 'needs_reconfirmation',
+          resolution_note: 'Owner confirmed 2026-11-14',
+        },
+      ],
+    });
+    expect(r.success).toBe(true);
+    expect((r as any).data.assembly).toBe('deterministic');
+    expect((r as any).data.verification_gates[0].status).toBe('needs_reconfirmation');
+  });
+
+  it('rejects invalid status/staleness/assembly enum values', () => {
+    expect(
+      engagementBriefSchema.safeParse({ ...VALID_BRIEF, staleness: 'fresh' }).success,
+    ).toBe(false);
+    expect(
+      engagementBriefSchema.safeParse({ ...VALID_BRIEF, assembly: 'magic' }).success,
+    ).toBe(false);
+    expect(
+      engagementBriefSchema.safeParse({
+        ...VALID_BRIEF,
+        verification_gates: [{ gate: 'g', blocks: 'p1', status: 'closed' }],
+      }).success,
+    ).toBe(false);
+  });
+});
+
 describe('engagement_brief registry entry', () => {
   it('resolves to the engagement_brief audit platform with a prompt suffix', () => {
     const resolved = resolveOutputSchema(ENGAGEMENT_BRIEF_SCHEMA_NAME);

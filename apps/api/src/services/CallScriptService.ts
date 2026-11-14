@@ -191,6 +191,12 @@ export interface AssembledCallScript {
    * gets them. Empty when no audit carries it.
    */
   benefits: string[];
+  /**
+   * The engagement brief's do_not_claim guardrails — prohibitions that
+   * travel with the ammunition so claim-motion copy can't contradict the
+   * spine. Empty when no brief/audit exists.
+   */
+  guardrails: string[];
 }
 
 /**
@@ -228,7 +234,7 @@ export interface AssembledSeedCallScript {
   };
   /**
    * Verbatim outreach ammunition resolved through the seed's primary-linked
-   * campaign → latest business_analysis audit (outreach_problems contract).
+   * campaign → engagement brief spine (business_analysis fallback).
    * Empty for unlinked or unaudited seeds.
    */
   ammunition: OutreachAmmunitionEntry[];
@@ -237,6 +243,12 @@ export interface AssembledSeedCallScript {
    * ammunition. Empty for unlinked or unaudited seeds.
    */
   benefits: string[];
+  /**
+   * The linked campaign brief's do_not_claim guardrails — the claim-motion
+   * copy on this script must not contradict them. Empty for unlinked or
+   * unaudited seeds.
+   */
+  guardrails: string[];
 }
 
 export interface CallConfirmationInput {
@@ -453,6 +465,11 @@ export class CallScriptService extends BaseService {
     let emergingAngles: HookAngle[] = [];
     let channelHint: ChannelHint = null;
     let auditDataForSeverity: BusinessAnalysisAuditData | null = null;
+    // Spine pack — the engagement brief's ranked pains + benefits +
+    // guardrails, overlaid for this campaign's archetype lane. Resolved
+    // once; ammunition/benefits/guardrails read it below (OQ7 migration —
+    // audit outreach_problems remains the fallback when no spine resolves).
+    const spinePack = await this.resolveSpinePack(campaignId, resolved.archetype);
     try {
       const auditResult = await BusinessContextService.getLatestAuditData(campaignId, ctx);
       if (auditResult) {
@@ -593,11 +610,16 @@ export class CallScriptService extends BaseService {
         })),
         linked_seed_id: seedId,
       },
-      // Outreach ammunition — verbatim problem → hook → fix copy from the
-      // audit already loaded for signal severity. Operator reference only;
-      // stage text is unchanged.
-      ammunition: this.extractAmmunition(auditDataForSeverity),
-      benefits: this.extractBenefits(auditDataForSeverity),
+      // Outreach ammunition — spine-first (the engagement brief's ranked
+      // pains + guardrails, overlaid for this campaign's archetype lane);
+      // audit outreach_problems is the fallback when no spine resolves.
+      ammunition: spinePack
+        ? spinePack.ammunition
+        : this.extractAmmunition(auditDataForSeverity),
+      benefits: spinePack?.benefits.length
+        ? spinePack.benefits
+        : this.extractBenefits(auditDataForSeverity),
+      guardrails: spinePack?.guardrails ?? [],
       anchor: anchorBlock,
     };
   }
@@ -723,14 +745,16 @@ export class CallScriptService extends BaseService {
     }
 
     // 4b. Outreach ammunition (best-effort) — resolve the seed's
-    //     primary-linked campaign and pull the outreach_problems verbatim
-    //     copy off its latest business_analysis audit. Same link traversal
-    //     as MarketIntelService (primary link_role first); getLatestAuditData
-    //     inherits the primary sibling's audit for non-primary siblings.
+    //     primary-linked campaign's ENGAGEMENT BRIEF SPINE first (ranked
+    //     pains + do_not_claim guardrails; the claim-motion copy inherits
+    //     the prohibitions the audit-only read never carried). Falls back
+    //     to the audit's outreach_problems when no spine resolves. Same
+    //     link traversal as MarketIntelService (primary link_role first).
     //     Unlinked or unaudited seeds get an empty list — the script is
     //     unchanged.
     let ammunition: OutreachAmmunitionEntry[] = [];
     let benefits: string[] = [];
+    let guardrails: string[] = [];
     try {
       const link = await this.prisma.directory_seed_campaign_links.findFirst({
         where: { seed_id: seedId },
@@ -738,9 +762,16 @@ export class CallScriptService extends BaseService {
         select: { campaign_id: true },
       });
       if (link?.campaign_id) {
-        const auditResult = await BusinessContextService.getLatestAuditData(link.campaign_id, ctx);
-        ammunition = this.extractAmmunition(auditResult?.auditData);
-        benefits = this.extractBenefits(auditResult?.auditData);
+        const pack = await this.resolveSpinePack(link.campaign_id, null);
+        if (pack) {
+          ammunition = pack.ammunition;
+          benefits = pack.benefits;
+          guardrails = pack.guardrails;
+        } else {
+          const auditResult = await BusinessContextService.getLatestAuditData(link.campaign_id, ctx);
+          ammunition = this.extractAmmunition(auditResult?.auditData);
+          benefits = this.extractBenefits(auditResult?.auditData);
+        }
       }
     } catch {
       // No linked campaign / audit lookup failed — ammunition stays empty
@@ -813,6 +844,7 @@ export class CallScriptService extends BaseService {
       },
       ammunition,
       benefits,
+      guardrails,
     };
   }
 
@@ -1167,6 +1199,38 @@ export class CallScriptService extends BaseService {
       conflicts,
       authorityReached: recon.authority_reached === true,
     };
+  }
+
+  /**
+   * Resolve the engagement-brief spine for a campaign and project it into
+   * the ammunition/benefits/guardrails the script surfaces need. Applies
+   * the archetype overlay when a lane is known (sibling campaigns rank the
+   * shared spine differently — D3). Returns null when no persisted brief
+   * and no business_analysis audit exist — callers keep their Pass-1
+   * fallback in that case (dual-emit migration posture).
+   */
+  private async resolveSpinePack(
+    campaignId: string,
+    archetype: string | null,
+  ): Promise<{
+    ammunition: OutreachAmmunitionEntry[];
+    benefits: string[];
+    guardrails: string[];
+  } | null> {
+    try {
+      const { loadBriefSpine, applyArchetypeOverlay, spineToAmmunition, spineBenefits, spineGuardrails } =
+        await import('./engagement-brief/brief-spine');
+      const pack = await loadBriefSpine(this.prisma, campaignId);
+      if (!pack) return null;
+      const spine = archetype ? applyArchetypeOverlay(pack.spine, archetype) : pack.spine;
+      return {
+        ammunition: spineToAmmunition(spine),
+        benefits: spineBenefits(spine),
+        guardrails: spineGuardrails(spine),
+      };
+    } catch {
+      return null;
+    }
   }
 
   /**

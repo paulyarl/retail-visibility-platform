@@ -74,7 +74,20 @@ const severityEnum = z.enum(['high', 'medium', 'low']);
 
 const whoCanAnswerEnum = z.enum(['owner', 'operator', 'public_source']);
 
+/** Gate resolution lifecycle (D8 — operator-editable on the card). */
+const gateStatusEnum = z.enum([
+  'pending',
+  'answered',
+  'needs_reconfirmation',
+  'skipped',
+]);
+
 // ─── Spine item blocks ──────────────────────────────────────────────────
+// v2 additions (D8): source_fragment (the join record — audit field path the
+// row was folded from), supporting_refs (multi-ref provenance, fixes the
+// single-ref loss), domain (the overlay bucket), provenance_broken (stamp
+// flag when an evidence_index path no longer resolves). All optional —
+// v1 model-emitted payloads remain valid.
 
 const briefPainSchema = z
   .object({
@@ -86,6 +99,20 @@ const briefPainSchema = z
     evidence_ref: coercedString,
     confidence: evidenceConfidenceEnum.optional(),
     visibility: visibilityEnum.optional(),
+    /** Audit field path this row was folded from (assembler join record). */
+    source_fragment: coercedString,
+    /** Additional evidence_index keys backing a composite finding. */
+    supporting_refs: stringArray,
+    /** Signal-domain bucket (review|website|directory|...) — the Phase-3
+     *  archetype overlay reorders on this, never on the fact itself. */
+    domain: coercedString,
+    /** Spoken lines carried verbatim from outreach_problems. */
+    regular: coercedString,
+    hook: coercedString,
+    fix: coercedString,
+    reconciliation_notes: stringArray,
+    /** Stamped when evidence_ref/supporting_refs no longer resolve. */
+    provenance_broken: coercedBoolean,
   })
   .passthrough();
 
@@ -99,6 +126,10 @@ const briefAssetSchema = z
     evidence_ref: coercedString,
     confidence: evidenceConfidenceEnum.optional(),
     visibility: visibilityEnum.optional(),
+    source_fragment: coercedString,
+    supporting_refs: stringArray,
+    domain: coercedString,
+    provenance_broken: coercedBoolean,
   })
   .passthrough();
 
@@ -110,6 +141,9 @@ const capabilityFitSchema = z
     why_it_fits: coercedString,
     confidence: judgmentConfidenceEnum.optional(),
     visibility: visibilityEnum.optional(),
+    source_fragment: coercedString,
+    domain: coercedString,
+    provenance_broken: coercedBoolean,
   })
   .passthrough();
 
@@ -121,6 +155,12 @@ const verificationGateSchema = z
     blocks: coercedString,
     who_can_answer: whoCanAnswerEnum.optional(),
     visibility: visibilityEnum.optional(),
+    source_fragment: coercedString,
+    /** Operator-editable resolution state — carries across re-imports by
+     *  identity (blocks + source_fragment hash); flips to
+     *  needs_reconfirmation when the fragment drifts (D8). */
+    status: gateStatusEnum.optional(),
+    resolution_note: coercedString,
   })
   .passthrough();
 
@@ -149,6 +189,24 @@ const briefSideSchema = z
 export const engagementBriefSchema = z
   .object({
     brief_version: z.number().int().min(1).optional(),
+    /** Code-stamped: hash of the assembler-read fields on the source audit.
+     *  The staleness check compares it to the latest audit's fingerprint —
+     *  identical means zero-spend re-verify (D4). */
+    evidence_fingerprint: coercedStringNullable,
+    /** current | stale — 'stale' when a newer source audit's fingerprint
+     *  differs from this brief's. Stamped 'current' at import. */
+    staleness: z.enum(['current', 'stale']).optional(),
+    /** What produced the spine: deterministic (assembler only), hybrid
+     *  (assembler + gated Layer-C model pass), or model (legacy import). */
+    assembly: z.enum(['deterministic', 'hybrid', 'model']).optional(),
+    /** The archetype domain this sibling's ranking overlay ranked for —
+     *  absent on the canonical business-level spine (D3). */
+    archetype_domain: coercedString,
+    /** Stamp-time evidence_index resolution result (D5). */
+    ref_integrity: z
+      .object({ broken: stringArray })
+      .passthrough()
+      .optional(),
     /** mkt_audits_list.id of the business_analysis audit this brief cites —
      *  audits and executions are different tables; cite the audit. Code
      *  stamps it at import. */
@@ -188,7 +246,7 @@ export const ENGAGEMENT_BRIEF_PROMPT_SUFFIX = `
 OUTPUT FORMAT — Return ONLY valid JSON matching this schema (no markdown fences, no commentary):
 
 {
-  "brief_version": 1,
+  "brief_version": 2,
   "source_audit_id": "<mkt_audits_list.id — leave empty; stamped at import>",
   "business": { "name": "", "category": "", "store_format": "" },
   "side": {

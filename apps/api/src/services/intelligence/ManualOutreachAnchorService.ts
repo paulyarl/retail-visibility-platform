@@ -393,18 +393,52 @@ export class ManualOutreachAnchorService extends BaseService {
         found++;
       }
 
-      // Audit outreach_problems (per platform — website_positioning etc.)
-      for (const [key, auditRow] of latestAudit) {
-        if (!key.startsWith(`${campaign.id}:`)) continue;
-        const platform = key.slice(campaign.id.length + 1);
-        for (const [i, p] of (Array.isArray(auditRow.audit_data?.outreach_problems) ? auditRow.audit_data.outreach_problems : []).entries()) {
-          if (!p || typeof p !== 'object' || !norm(p.problem)) continue;
-          candidates.push({
-            campaignId: campaign.id, label, source: platform, index: i,
-            problem: asString(p.problem), regular: asString(p.regular), hook: asString(p.hook),
-            solution: asString(p.solution), evidence: asString(p.evidence), outreachUse: asString(p.outreach_use),
-          });
-          found++;
+      // Engagement-brief spine (sibling-aware, 3.2a): each linked sibling
+      // resolves ITS overlay-ranked spine — the archetype lane's top pains
+      // first — instead of the flat audit outreach_problems pull. Guardrails
+      // don't need to travel here: anchors carry problem→solution copy, the
+      // prohibitions live on the spine card + script surfaces.
+      try {
+        const { loadBriefSpine, applyArchetypeOverlay, spineToAmmunition } = await import(
+          '../engagement-brief/brief-spine'
+        );
+        const { resolveDeclaredArchetype } = await import('../OutreachOpenerService');
+        const pack = await loadBriefSpine(this.prisma, campaign.id);
+        if (pack) {
+          const declared = await resolveDeclaredArchetype(campaign.id, ctx).catch(() => null);
+          const spine = declared?.archetype
+            ? applyArchetypeOverlay(pack.spine, declared.archetype)
+            : pack.spine;
+          for (const [i, p] of spineToAmmunition(spine).entries()) {
+            if (!norm(p.problem)) continue;
+            candidates.push({
+              campaignId: campaign.id, label, source: 'engagement_spine', index: i,
+              problem: p.problem, regular: p.regular, hook: p.hook,
+              solution: p.solution, evidence: p.evidence, outreachUse: p.outreach_use,
+            });
+            found++;
+          }
+        }
+      } catch {
+        // spine read failed — audit fragments still below as fallback
+      }
+
+      // Audit outreach_problems fallback — only when the spine yielded no
+      // candidates for this campaign (OQ7: audit fragments are the fallback
+      // read, not a competing voice).
+      if (found === 0) {
+        for (const [key, auditRow] of latestAudit) {
+          if (!key.startsWith(`${campaign.id}:`)) continue;
+          const platform = key.slice(campaign.id.length + 1);
+          for (const [i, p] of (Array.isArray(auditRow.audit_data?.outreach_problems) ? auditRow.audit_data.outreach_problems : []).entries()) {
+            if (!p || typeof p !== 'object' || !norm(p.problem)) continue;
+            candidates.push({
+              campaignId: campaign.id, label, source: platform, index: i,
+              problem: asString(p.problem), regular: asString(p.regular), hook: asString(p.hook),
+              solution: asString(p.solution), evidence: asString(p.evidence), outreachUse: asString(p.outreach_use),
+            });
+            found++;
+          }
         }
       }
 

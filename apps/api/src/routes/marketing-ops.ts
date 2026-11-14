@@ -4964,6 +4964,29 @@ router.get('/:id/outreach-problems', async (req: any, res: Response) => {
       });
     };
 
+    // 0. Engagement-brief spine FIRST (OQ7 migration): the ranked play —
+    //    pains in this sibling's overlay order — leads the aggregate so the
+    //    pitch-construction slots fill from the spine, not a flat fragment
+    //    pull. Triage briefing + audit problems follow as dedupe'd extras.
+    try {
+      const { loadBriefSpine, applyArchetypeOverlay, spineToAmmunition } = await import(
+        '../services/engagement-brief/brief-spine'
+      );
+      const { resolveDeclaredArchetype } = await import('../services/OutreachOpenerService');
+      const pack = await loadBriefSpine(prisma, campaignId);
+      if (pack) {
+        const declared = await resolveDeclaredArchetype(campaignId, ctx).catch(() => null);
+        const spine = declared?.archetype
+          ? applyArchetypeOverlay(pack.spine, declared.archetype)
+          : pack.spine;
+        for (const p of spineToAmmunition(spine)) {
+          push({ ...p, outreach_use: p.outreach_use });
+        }
+      }
+    } catch {
+      // best-effort — fragment sources below still serve the list
+    }
+
     // 1. Triage briefing variant (persisted by the triage/repair seek runs).
     const brief = (campaign?.repair_triage_briefing as any) ?? null;
     for (const p of Array.isArray(brief?.outreach_problems) ? brief.outreach_problems : []) push(p);
@@ -4988,6 +5011,36 @@ router.get('/:id/outreach-problems', async (req: any, res: Response) => {
     }
 
     res.json({ success: true, data: problems });
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// POST /:id/engagement-brief/gates/:gateIndex/resolve — write a gate's
+// resolution state onto the campaign's latest persisted engagement brief
+// (4.4b: the communications lane resolves verification gates). The gate is
+// addressed by array index — the card lists gates in spine order.
+router.post('/:id/engagement-brief/gates/:gateIndex/resolve', async (req: any, res: Response) => {
+  try {
+    const ctx = getCtx(req);
+    const gateIndex = Number(req.params.gateIndex);
+    const { status, resolution_note } = req.body ?? {};
+    const allowed = ['pending', 'answered', 'skipped', 'needs_reconfirmation'];
+    if (!Number.isInteger(gateIndex) || gateIndex < 0) {
+      return res.status(400).json({ success: false, error: 'gateIndex must be a non-negative integer' });
+    }
+    if (!allowed.includes(status)) {
+      return res.status(400).json({ success: false, error: `status must be one of ${allowed.join(', ')}` });
+    }
+    const { resolveBriefGate } = await import('../services/engagement-brief/brief-spine');
+    const result = await resolveBriefGate(prisma, req.params.id, gateIndex, status, resolution_note);
+    if (!result) {
+      return res.status(404).json({
+        success: false,
+        error: 'No persisted engagement brief (or gate index out of range) — run or import the brief first.',
+      });
+    }
+    res.json({ success: true, data: result });
   } catch (error) {
     handleServiceError(res, error, getCtx(req));
   }

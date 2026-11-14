@@ -68,6 +68,11 @@ export interface SeoDemandMarket {
   published: number;
 }
 
+export interface SeoDemandFacets {
+  categories: string[];
+  cities: Array<{ city: string; state: string | null }>;
+}
+
 export interface SeoDemandSummary {
   routes: Array<{ route: string; queries: number; impressions_28d: number; open: number }>;
   ingest: { last_date: string | null; last_fetched: string | null; page_impressions_28d: number; page_clicks_28d: number };
@@ -100,6 +105,7 @@ class SeoDemandAdminService extends AdminApiSingleton {
   }
 
   getSummary() { return this.get<SeoDemandSummary>('/summary'); }
+  getFacets() { return this.get<SeoDemandFacets>('/facets'); }
   listSignals(params: Record<string, string>) { return this.get<Paged<SeoQuerySignal>>('/signals', params); }
   listGaps(params: Record<string, string>) { return this.get<Paged<SeoDemandGap>>('/gaps', params); }
   listMarkets(params: Record<string, string>) { return this.get<Paged<SeoDemandMarket>>('/markets', params); }

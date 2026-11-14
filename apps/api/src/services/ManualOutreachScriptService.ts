@@ -821,6 +821,24 @@ export class ManualOutreachScriptService extends BaseService {
       if (typeof triageHook === 'string' && triageHook.trim()) {
         merge.analyst_hook = triageHook.trim();
       }
+      // Engagement-brief spine (OQ7 migration): the ranked primary hook is
+      // the authoritative pain after the operator-accepted triage pitch —
+      // the spine hook line wins over the audit's raw primary_outreach_hook.
+      if (!merge.analyst_hook) {
+        const { loadBriefSpine, applyArchetypeOverlay, spinePrimaryHook } = await import(
+          './engagement-brief/brief-spine'
+        );
+        const pack = await loadBriefSpine(this.prisma, campaignId);
+        if (pack) {
+          const declared = (campaign as any).declared_archetype ?? null;
+          const spine = declared ? applyArchetypeOverlay(pack.spine, declared) : pack.spine;
+          const primary = spinePrimaryHook(spine);
+          const spineHook = primary?.hook ?? primary?.business_consequence ?? null;
+          if (typeof spineHook === 'string' && spineHook.trim()) {
+            merge.analyst_hook = spineHook.trim();
+          }
+        }
+      }
       if (!merge.analyst_hook) {
         const briefExecs = await this.prisma.mkt_prompt_executions_list.findMany({
           where: {

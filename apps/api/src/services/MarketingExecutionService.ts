@@ -790,6 +790,44 @@ export class MarketingExecutionService extends BaseService {
               2,
             );
           }
+          // Engagement-brief spine (3.2): the sibling's briefing renders its
+          // outreach material from the SHARED spine ranked for its own
+          // archetype lane — overlay-ordered pains + guardrails ride the
+          // injected extract so briefing facts can no longer diverge from
+          // the spine. Best-effort: no brief → extract unchanged.
+          try {
+            const { loadBriefSpine, applyArchetypeOverlay, spinePrimaryHook, spineGuardrails } =
+              await import('./engagement-brief/brief-spine');
+            const pack = await loadBriefSpine(this.prisma, input.campaign.id);
+            if (pack) {
+              const spine = applyArchetypeOverlay(pack.spine, archetypeBriefing.archetype);
+              const primary = spinePrimaryHook(spine);
+              const ranked = (spine.pains ?? []).map((p: any) => ({
+                rank: p.ref_id,
+                domain: p.domain,
+                consequence: p.business_consequence,
+                regular: p.regular,
+                hook: p.hook,
+                fix: p.fix,
+              }));
+              effectiveVariables.archetype_extract =
+                `${effectiveVariables.archetype_extract}\n\n` +
+                `RANKED SPINE (this sibling's lane — rank problems in this order; facts may not diverge):\n` +
+                JSON.stringify(
+                  {
+                    primary_hook: primary
+                      ? { consequence: primary.business_consequence, regular: primary.regular, hook: primary.hook }
+                      : null,
+                    ranked_pains: ranked,
+                    do_not_claim: spineGuardrails(spine),
+                  },
+                  null,
+                  2,
+                );
+            }
+          } catch {
+            // best-effort — the fact slice alone still feeds the briefing
+          }
         }
 
         // 0b. Engagement Brief (Pass 2 — Audit Channel Scan spec): the brief

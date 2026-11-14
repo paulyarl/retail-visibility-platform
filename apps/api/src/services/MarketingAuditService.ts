@@ -94,6 +94,22 @@ export class MarketingAuditService extends BaseService {
             campaignId: input.campaignId,
           });
         }
+        // Engagement-brief spine refresh (D4 dirty-queue lane): fingerprint
+        // diff → mark stale → deterministic reassemble with gate carry-over.
+        // Best-effort, same posture as the seed resharpen — a failure must
+        // not fail the audit import.
+        try {
+          const { refreshBriefsAfterAuditImport } = await import(
+            './engagement-brief/brief-spine.js'
+          );
+          await refreshBriefsAfterAuditImport(this.prisma, input.campaignId, ctx);
+        } catch (err) {
+          logger.warn('Post-audit engagement-brief refresh failed (best-effort)', ctx, {
+            error: (err as Error).message,
+            auditId: id,
+            campaignId: input.campaignId,
+          });
+        }
       }
 
       return audit;
