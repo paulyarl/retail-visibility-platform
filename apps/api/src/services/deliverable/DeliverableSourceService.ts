@@ -1041,6 +1041,15 @@ export class DeliverableSourceService extends BaseService {
           if (p?.hook) lines.push(`Problem hook: ${p.hook}`);
         }
       }
+      // Spine benefits lead the upside lanes (OQ7 migration) — the spine's
+      // benefits fold is the same list the outreach artifacts pitched from.
+      try {
+        const { loadBriefSpine, spineBenefits } = await import('../engagement-brief/brief-spine');
+        const pack = await loadBriefSpine(this.prisma, campaignId);
+        if (pack) pushBenefits(spineBenefits(pack.spine), 'Spine');
+      } catch {
+        // best-effort — the briefing/audit lanes below still serve
+      }
       pushBenefits(briefing?.benefits, 'Promised');
       pushBenefits(auditData?.benefits, 'Audit');
     } catch (e) {
