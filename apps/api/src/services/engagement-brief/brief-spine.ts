@@ -65,6 +65,71 @@ async function loadPersistedBrief(
  * Resolve the campaign's spine. Never throws — consumers get null and fall
  * back to their Pass-1 read (dual-emit migration posture, D6).
  */
+/**
+ * v1 briefs predate the projection fields — pains carry only
+ * business_consequence + severity; no domain/hook/regular/fix/benefits.
+ * Hydrate the missing spoken lines from the source audit's
+ * outreach_problems (domain + token-overlap match, the assembler's rule)
+ * so consumers see near-parity ammunition until the audit-import refresh
+ * lane upgrades the row to v2. Fill-only — v1 fields are never overwritten.
+ */
+export function hydrateLegacySpine(spine: any, auditData: any): any {
+  if (!spine || spine.evidence_fingerprint) return spine;
+  const problems: any[] = Array.isArray(auditData?.outreach_problems)
+    ? auditData.outreach_problems
+    : [];
+  const tokenize = (s: string) =>
+    new Set(
+      (s ?? '')
+        .toLowerCase()
+        .replace(/[^a-z0-9\s]/g, ' ')
+        .split(/\s+/)
+        .filter((w) => w.length > 3),
+    );
+  const overlap = (a: Set<string>, b: Set<string>) => {
+    let n = 0;
+    for (const t of a) {
+      for (const u of b) {
+        if (t === u || t.startsWith(u) || u.startsWith(t)) {
+          n++;
+          break;
+        }
+      }
+    }
+    return n;
+  };
+  const pains = (spine.pains ?? []).map((p: any) => {
+    const pDomain = p.domain ?? classifyDomain(`${p.business_consequence ?? ''} ${p.pain ?? ''}`);
+    if (p.hook || p.regular || p.fix || problems.length === 0) {
+      return p.domain ? p : { ...p, domain: pDomain };
+    }
+    const pTokens = tokenize(`${p.business_consequence ?? ''} ${p.pain ?? ''}`);
+    let best: any = null;
+    let bestScore = 0;
+    for (const op of problems) {
+      const opText = `${op?.problem ?? ''} ${op?.hook ?? ''} ${op?.regular ?? ''}`;
+      const score =
+        overlap(pTokens, tokenize(opText)) + (classifyDomain(opText) === pDomain ? 2 : 0);
+      if (score > bestScore) {
+        bestScore = score;
+        best = op;
+      }
+    }
+    // Require domain agreement + at least one content token before borrowing
+    // spoken lines — a cross-domain borrow would put the wrong words on a pain.
+    if (!best || bestScore < 3) return p.domain ? p : { ...p, domain: pDomain };
+    return {
+      ...p,
+      domain: pDomain,
+      hook: p.hook ?? best.hook,
+      regular: p.regular ?? best.regular,
+      fix: p.fix ?? best.solution,
+      outreach_use: p.outreach_use ?? best.outreach_use,
+    };
+  });
+  return { ...spine, pains };
+}
+
 export async function loadBriefSpine(
   prisma: any,
   campaignId: string,
@@ -72,17 +137,22 @@ export async function loadBriefSpine(
   try {
     const persisted = await loadPersistedBrief(prisma, campaignId);
     if (persisted?.audit_data) {
-      const spine = persisted.audit_data as AssembledBrief;
-      let stale = spine.staleness === 'stale';
-      // Cheap live check when the row wasn't marked by the refresh path:
-      // fingerprint of the current source audit vs the stored one.
-      if (!stale && spine.evidence_fingerprint) {
-        const sourceAudit = await loadBriefSourceAudit(prisma, campaignId);
+      const raw = persisted.audit_data as AssembledBrief;
+      const isLegacy = !raw.evidence_fingerprint;
+      let stale = raw.staleness === 'stale';
+      // Fetch the source audit when it's needed — the fingerprint check for
+      // v2 rows, or spoken-line hydration for legacy v1 rows.
+      const sourceAudit =
+        isLegacy || (!stale && raw.evidence_fingerprint)
+          ? await loadBriefSourceAudit(prisma, campaignId)
+          : null;
+      if (!stale && raw.evidence_fingerprint) {
         stale =
           !!sourceAudit?.audit_data &&
-          spine.evidence_fingerprint !==
+          raw.evidence_fingerprint !==
             (await import('./brief-assembler')).computeEvidenceFingerprint(sourceAudit.audit_data);
       }
+      const spine = isLegacy ? hydrateLegacySpine(raw, sourceAudit?.audit_data) : raw;
       return {
         spine,
         source: 'persisted',
