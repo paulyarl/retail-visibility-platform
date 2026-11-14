@@ -44,6 +44,14 @@ const MISSING_LABELS: Record<string, string> = {
   secondary_categories: 'sec categories',
 };
 
+/** Bulk enrichment only ever touches these two states — invited (claim
+ *  link already in the business's hands), claimed (a real customer) and
+ *  suppressed (retired) rows can be inspected but are never sent to
+ *  backfill or recompose. */
+const ACTIONABLE_THIN_STATUSES = new Set(['draft', 'published']);
+/** Display order for the completeness status chips; extras sort after. */
+const THIN_STATUS_ORDER = ['draft', 'published', 'invited', 'claimed', 'suppressed'];
+
 function PgBadge() {
   return (
     <span className="inline-flex items-center rounded bg-purple-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-purple-700 dark:bg-purple-900/40 dark:text-purple-300">
@@ -547,10 +555,21 @@ function CleanupContent() {
     [report],
   );
   const thinSeeds = report?.completeness.thinSeeds ?? [];
-  const [thinStatusFilter, setThinStatusFilter] = useState<'all' | 'draft' | 'published'>('all');
-  const visibleThinSeeds = thinStatusFilter === 'all'
+  const [thinStatusFilter, setThinStatusFilter] = useState<string>('all');
+  const thinStatuses = useMemo(() => {
+    const present = new Set(thinSeeds.map((s) => s.status));
+    return [
+      ...THIN_STATUS_ORDER.filter((s) => present.has(s)),
+      ...[...present].filter((s) => !THIN_STATUS_ORDER.includes(s)).sort(),
+    ];
+  }, [thinSeeds]);
+  // A stale selection (batch swap removed that status) falls back to all.
+  const effectiveThinStatusFilter =
+    thinStatusFilter !== 'all' && thinStatuses.includes(thinStatusFilter) ? thinStatusFilter : 'all';
+  const visibleThinSeeds = effectiveThinStatusFilter === 'all'
     ? thinSeeds
-    : thinSeeds.filter((s) => s.status === thinStatusFilter);
+    : thinSeeds.filter((s) => s.status === effectiveThinStatusFilter);
+  const actionableThinSeeds = visibleThinSeeds.filter((s) => ACTIONABLE_THIN_STATUSES.has(s.status));
 
   const runAction = async (fn: () => Promise<string>) => {
     setBusy(true);
@@ -634,10 +653,8 @@ function CleanupContent() {
 
   const handleBackfillAll = () =>
     runAction(async () => {
-      const ids = visibleThinSeeds
-        .filter((s) => s.status !== 'claimed' && s.status !== 'suppressed')
-        .map((s) => s.seedId);
-      if (ids.length === 0) return 'No live thin seeds to backfill.';
+      const ids = actionableThinSeeds.map((s) => s.seedId);
+      if (ids.length === 0) return 'No draft or published thin seeds in view to backfill.';
       const r = await directoryPresenceAdminService.backfillSeedEnrichment(ids);
       const sharpened = r.results.filter((x) => x.seoSharpened).length;
       const prov = r.results.reduce((n, x) => n + (x.provenanceWritten ?? 0), 0);
@@ -656,14 +673,12 @@ function CleanupContent() {
    */
   const handleRecomposeAll = () =>
     runAction(async () => {
-      const ids = visibleThinSeeds
-        .filter((s) => s.status !== 'claimed' && s.status !== 'suppressed')
-        .map((s) => s.seedId);
-      if (ids.length === 0) return 'No live seeds to recompose.';
+      const ids = actionableThinSeeds.map((s) => s.seedId);
+      if (ids.length === 0) return 'No draft or published seeds in view to recompose.';
       const ok = window.confirm(
         `Recompose SEO copy for ${ids.length} seed${ids.length !== 1 ? 's' : ''}?\n\n` +
           'This overwrites description, keywords and same_as with freshly composed copy, ' +
-          'including any hand edits. Claimed and suppressed seeds are skipped.',
+          'including any hand edits. Claimed, invited and suppressed seeds are skipped.',
       );
       if (!ok) return 'Recompose cancelled.';
       const r = await directoryPresenceAdminService.recomposeSeedEnrichment(ids);
@@ -829,18 +844,20 @@ function CleanupContent() {
                 : `${visibleThinSeeds.length} of ${report?.completeness.totalSeeds ?? 0} seeds missing fields`}
             </span>
             <div className="flex items-center gap-1 ml-2">
-              {(['all', 'draft', 'published'] as const).map((f) => (
+              {['all', ...thinStatuses].map((f) => (
                 <button
                   key={f}
                   type="button"
                   onClick={() => setThinStatusFilter(f)}
                   className={`px-2 py-0.5 text-xs rounded-full border ${
-                    thinStatusFilter === f
+                    effectiveThinStatusFilter === f
                       ? 'bg-gray-800 text-white border-gray-800 dark:bg-gray-200 dark:text-gray-900'
                       : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50 dark:bg-neutral-800 dark:text-gray-300 dark:border-neutral-600'
                   }`}
                 >
-                  {f === 'all' ? 'All' : f === 'draft' ? 'Drafts' : 'Published'}
+                  {f === 'all' ? 'All' : f === 'draft' ? 'Drafts' : f.charAt(0).toUpperCase() + f.slice(1)}
+                  {' · '}
+                  {f === 'all' ? thinSeeds.length : thinSeeds.filter((s) => s.status === f).length}
                 </button>
               ))}
             </div>
@@ -849,20 +866,25 @@ function CleanupContent() {
             <button
               type="button"
               onClick={handleBackfillAll}
-              disabled={busy || loading}
+              disabled={busy || loading || actionableThinSeeds.length === 0}
+              title={
+                actionableThinSeeds.length === 0
+                  ? 'No draft or published seeds in this view — invited, claimed and suppressed seeds are never touched by bulk actions'
+                  : 'Fills missing provenance, attributes, hours and SEO on the draft/published seeds in view'
+              }
               className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
             >
               <ArrowUpRight className="h-3.5 w-3.5" />
-              Backfill all thin seeds
+              Backfill {actionableThinSeeds.length} thin seed{actionableThinSeeds.length !== 1 ? 's' : ''}
             </button>
             <button
               type="button"
               onClick={handleRecomposeAll}
-              disabled={busy || loading}
-              title="Overwrites description, keywords and same_as with freshly composed copy"
+              disabled={busy || loading || actionableThinSeeds.length === 0}
+              title="Overwrites description, keywords and same_as with freshly composed copy — draft/published only; invited, claimed and suppressed are skipped"
               className="inline-flex items-center gap-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-800 hover:bg-amber-100 disabled:opacity-50 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-300"
             >
-              Recompose SEO copy
+              Recompose SEO copy ({actionableThinSeeds.length})
             </button>
           </>)}
         </div>
@@ -898,7 +920,16 @@ function CleanupContent() {
                       </div>
                       <div className="text-[11px] text-gray-400">{s.seedBatch || 'no batch'}</div>
                     </td>
-                    <td className="px-4 py-2 text-xs text-gray-600 dark:text-gray-400">{s.status}</td>
+                    <td
+                      className="px-4 py-2 text-xs text-gray-600 dark:text-gray-400"
+                      title={
+                        ACTIONABLE_THIN_STATUSES.has(s.status)
+                          ? undefined
+                          : 'Skipped by backfill/recompose — bulk actions only touch draft and published seeds'
+                      }
+                    >
+                      {s.status}
+                    </td>
                     <td className="px-4 py-2">
                       <div className="flex max-w-md flex-wrap gap-1">
                         {s.missing.map((m) => (
