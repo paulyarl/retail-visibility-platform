@@ -613,7 +613,7 @@ export class CallScriptService extends BaseService {
       // Outreach ammunition — spine-first (the engagement brief's ranked
       // pains + guardrails, overlaid for this campaign's archetype lane);
       // audit outreach_problems is the fallback when no spine resolves.
-      ammunition: spinePack
+      ammunition: spinePack?.ammunition.length
         ? spinePack.ammunition
         : this.extractAmmunition(auditDataForSeverity),
       benefits: spinePack?.benefits.length
@@ -767,6 +767,13 @@ export class CallScriptService extends BaseService {
           ammunition = pack.ammunition;
           benefits = pack.benefits;
           guardrails = pack.guardrails;
+          // Legacy v1 briefs lack projection fields the fold can't
+          // backfill (e.g. benefits) — fill empty lanes from the audit.
+          if (!ammunition.length || !benefits.length) {
+            const auditResult = await BusinessContextService.getLatestAuditData(link.campaign_id, ctx);
+            if (!ammunition.length) ammunition = this.extractAmmunition(auditResult?.auditData);
+            if (!benefits.length) benefits = this.extractBenefits(auditResult?.auditData);
+          }
         } else {
           const auditResult = await BusinessContextService.getLatestAuditData(link.campaign_id, ctx);
           ammunition = this.extractAmmunition(auditResult?.auditData);
