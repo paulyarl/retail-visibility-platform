@@ -67,7 +67,7 @@ describe('applyEngagementBriefStamp', () => {
       { prisma, campaignId: 'camp_1' },
     );
 
-    expect(prisma.mkt_audits_list.findFirst).toHaveBeenCalledWith(
+    expect(prisma.mkt_audits_list.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: { campaign_id: 'camp_1', platform: 'business_analysis' },
       }),
@@ -153,6 +153,85 @@ describe('assertEngagementBriefSourceAudit', () => {
     await expect(
       assertEngagementBriefSourceAudit({ id: 'camp_4' }, prisma),
     ).rejects.toThrow(/Business Audit/i);
+  });
+});
+
+describe('applyEngagementBriefStamp — fingerprint + ref integrity (D4/D5)', () => {
+  it('stamps evidence_fingerprint from the source audit and staleness current', async () => {
+    const prisma = prismaWithAudit(SOURCE_AUDIT);
+    const out = await applyEngagementBriefStamp(
+      { business: { name: 'Dreamcast' } },
+      { prisma, campaignId: 'camp_1' },
+    );
+    expect(typeof out.evidence_fingerprint).toBe('string');
+    expect(out.staleness).toBe('current');
+    expect(out.assembly).toBe('model');
+  });
+
+  it('preserves an assembler-emitted assembly tag', async () => {
+    const prisma = prismaWithAudit(SOURCE_AUDIT);
+    const out = await applyEngagementBriefStamp(
+      { assembly: 'deterministic' },
+      { prisma, campaignId: 'camp_1' },
+    );
+    expect(out.assembly).toBe('deterministic');
+  });
+
+  it('flags spine items whose evidence_index paths do not resolve', async () => {
+    const prisma = prismaWithAudit(SOURCE_AUDIT);
+    const out = await applyEngagementBriefStamp(
+      {
+        evidence_index: {
+          good: 'combined_review_metrics.observable_unanswered_reviews',
+          bad: 'platforms.tiktok.followers',
+        },
+        pains: [
+          { ref_id: 'p1', evidence_ref: 'bad' },
+          { ref_id: 'p2', evidence_ref: 'good' },
+          { ref_id: 'p3', evidence_ref: 'good', supporting_refs: ['bad'] },
+        ],
+      },
+      { prisma, campaignId: 'camp_1' },
+    );
+    expect(out.ref_integrity.broken).toEqual(['bad']);
+    expect(out.pains[0].provenance_broken).toBe(true);
+    expect(out.pains[1].provenance_broken).toBeUndefined();
+    // a broken supporting ref flags the item too
+    expect(out.pains[2].provenance_broken).toBe(true);
+  });
+
+  it('writes no ref_integrity block when every path resolves', async () => {
+    const prisma = prismaWithAudit(SOURCE_AUDIT);
+    const out = await applyEngagementBriefStamp(
+      {
+        evidence_index: { w1: 'website.url' },
+        pains: [{ ref_id: 'p1', evidence_ref: 'w1' }],
+      },
+      { prisma, campaignId: 'camp_1' },
+    );
+    expect(out.ref_integrity).toBeUndefined();
+    expect(out.pains[0].provenance_broken).toBeUndefined();
+  });
+
+  it('resolves the pooled sibling audit when the campaign has none of its own', async () => {
+    const prisma = {
+      mkt_audits_list: {
+        findMany: vi
+          .fn()
+          .mockResolvedValueOnce([]) // own campaign — no audits
+          .mockResolvedValueOnce([{ ...SOURCE_AUDIT, platform: 'business_analysis' }]), // sibling pool
+      },
+      mkt_campaigns_list: {
+        findUnique: vi.fn().mockResolvedValue({ business_prospect_id: 'bp_1' }),
+        findMany: vi.fn().mockResolvedValue([{ id: 'camp_sibling_1' }]),
+      },
+    };
+    const out = await applyEngagementBriefStamp(
+      { business: { name: 'Sibling' } },
+      { prisma, campaignId: 'camp_child' },
+    );
+    // G11 — the non-primary sibling stamps the primary's audit, not null.
+    expect(out.source_audit_id).toBe('aud_source_1');
   });
 });
 

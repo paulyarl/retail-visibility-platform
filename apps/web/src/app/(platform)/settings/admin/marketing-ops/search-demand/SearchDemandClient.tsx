@@ -5,8 +5,9 @@ import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { ArrowDown, ArrowUp, Check, ExternalLink, Loader2, RefreshCw, X } from 'lucide-react';
 import seoDemandAdminService, {
-  Paged, SeoDemandGap, SeoDemandMarket, SeoDemandSummary, SeoQuerySignal,
+  Paged, SeoDemandFacets, SeoDemandGap, SeoDemandMarket, SeoDemandSummary, SeoQuerySignal,
 } from '@/services/SeoDemandAdminService';
+import SuggestiveSelect from '@/components/marketing-ops/SuggestiveSelect';
 
 type Tab = 'signals' | 'gaps' | 'markets';
 
@@ -53,6 +54,21 @@ const pathOf = (url: string | null) => {
   try { return new URL(url).pathname; } catch { return url; }
 };
 
+/** Local input state debounced into a URL search param (same pattern as the search box). */
+function useFilterParam(
+  param: (k: string, d?: string) => string,
+  setParams: (updates: Record<string, string | null>) => void,
+  key: string,
+) {
+  const [value, setValue] = useState(param(key));
+  useEffect(() => { setValue(param(key)); }, [param, key]);
+  useEffect(() => {
+    const t = setTimeout(() => { if (value !== param(key)) setParams({ [key]: value }); }, 350);
+    return () => clearTimeout(t);
+  }, [value, param, setParams, key]);
+  return [value, setValue] as const;
+}
+
 export default function SearchDemandClient() {
   const router = useRouter();
   const pathname = usePathname();
@@ -72,6 +88,7 @@ export default function SearchDemandClient() {
   }, [pathname, router, searchParams]);
 
   const [summary, setSummary] = useState<SeoDemandSummary | null>(null);
+  const [facets, setFacets] = useState<SeoDemandFacets | null>(null);
   const [data, setData] = useState<Paged<any> | null>(null);
   const [dataTab, setDataTab] = useState<Tab | null>(null);
   const [loading, setLoading] = useState(true);
@@ -79,13 +96,10 @@ export default function SearchDemandClient() {
   const [busy, setBusy] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
-  // Text inputs are debounced into the URL.
-  const [qInput, setQInput] = useState(param('q'));
-  useEffect(() => { setQInput(param('q')); }, [param]);
-  useEffect(() => {
-    const t = setTimeout(() => { if (qInput !== param('q')) setParams({ q: qInput }); }, 350);
-    return () => clearTimeout(t);
-  }, [qInput, param, setParams]);
+  // Filter inputs are debounced into the URL.
+  const [qInput, setQInput] = useFilterParam(param, setParams, 'q');
+  const [categoryInput, setCategoryInput] = useFilterParam(param, setParams, 'category');
+  const [cityInput, setCityInput] = useFilterParam(param, setParams, 'city');
 
   const apiParams = useMemo(() => {
     const p: Record<string, string> = {};
@@ -103,10 +117,15 @@ export default function SearchDemandClient() {
         : tab === 'markets'
           ? seoDemandAdminService.listMarkets(apiParams)
           : seoDemandAdminService.listSignals(apiParams);
-      const [res, sum] = await Promise.all([fetcher, seoDemandAdminService.getSummary()]);
+      const [res, sum, fac] = await Promise.all([
+        fetcher,
+        seoDemandAdminService.getSummary(),
+        seoDemandAdminService.getFacets(),
+      ]);
       setData(res);
       setDataTab(tab);
       setSummary(sum);
+      setFacets(fac);
     } catch (e: any) {
       setError(e?.message || 'failed_to_load');
     } finally {
@@ -172,6 +191,23 @@ export default function SearchDemandClient() {
     return `/settings/admin/directory/batches?${qs.toString()}`;
   };
 
+  // City facet: distinct city names as option values (the API filters on
+  // s.city), labelled "City, ST" when the city maps to a single state.
+  const cityFilter = useMemo(() => {
+    const statesByCity = new Map<string, Set<string>>();
+    for (const c of facets?.cities ?? []) {
+      const set = statesByCity.get(c.city) ?? new Set<string>();
+      if (c.state) set.add(c.state);
+      statesByCity.set(c.city, set);
+    }
+    const options = [...statesByCity.keys()].sort((a, b) => a.localeCompare(b));
+    const labels: Record<string, string> = {};
+    for (const [city, states] of statesByCity) {
+      labels[city] = states.size === 1 ? `${city}, ${[...states][0]}` : city;
+    }
+    return { options, labels };
+  }, [facets]);
+
   const select = (key: string, label: string, options: string[], labels?: Record<string, string>) => (
     <label className="flex flex-col text-xs text-gray-600">
       {label}
@@ -196,6 +232,29 @@ export default function SearchDemandClient() {
         key={`${key}:${param(key)}`}
         onBlur={(e) => { if (e.target.value !== param(key)) setParams({ [key]: e.target.value }); }}
         onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
+      />
+    </label>
+  );
+
+  const facetSelect = (
+    label: string,
+    value: string,
+    onChange: (v: string) => void,
+    options: string[],
+    optionLabels?: Record<string, string>,
+    newInputPlaceholder = '',
+  ) => (
+    <label className="flex flex-col text-xs text-gray-600">
+      {label}
+      <SuggestiveSelect
+        value={value}
+        onChange={onChange}
+        options={options}
+        optionLabels={optionLabels}
+        emptyLabel="All"
+        newLabel="+ New..."
+        newInputPlaceholder={newInputPlaceholder}
+        className="mt-1 rounded border border-gray-300 px-2 py-1 text-sm text-gray-900"
       />
     </label>
   );
@@ -328,8 +387,8 @@ export default function SearchDemandClient() {
         </label>
         {select('window', 'Window', ['7', '28', '90'], { '7': '7 days', '28': '28 days', '90': '90 days' })}
         {text('minImpressions', 'Min impressions', '0', 'w-24')}
-        {tab !== 'markets' && text('category', 'Category', 'e.g. Halal Grocery Store', 'w-48')}
-        {tab !== 'markets' && text('city', 'City')}
+        {tab !== 'markets' && facetSelect('Category', categoryInput, setCategoryInput, facets?.categories ?? [], undefined, 'Filter by category')}
+        {tab !== 'markets' && facetSelect('City', cityInput, setCityInput, cityFilter.options, cityFilter.labels, 'Filter by city')}
         {text('state', 'State', 'MO', 'w-16')}
         {tab === 'signals' && (
           <>

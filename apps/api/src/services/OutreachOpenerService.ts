@@ -433,6 +433,24 @@ export class OutreachOpenerService extends BaseService {
       JSON.stringify(extractedFields, null, 2),
       closeVariant,
     );
+
+    // Engagement-brief spine (OQ7 migration): the ranked play + do_not_claim
+    // guardrails are appended to every generated prompt so opener copy can't
+    // contradict the spine or assert a prohibited claim. Best-effort — a
+    // missing brief leaves the prompt unchanged.
+    try {
+      const { loadBriefSpine, applyArchetypeOverlay, spinePromptBlock } = await import(
+        './engagement-brief/brief-spine'
+      );
+      const pack = await loadBriefSpine(this.prisma, campaignId);
+      if (pack) {
+        const spine = applyArchetypeOverlay(pack.spine, selection.archetype);
+        resolvedPrompt = `${resolvedPrompt}\n\n${spinePromptBlock(spine)}`;
+      }
+    } catch {
+      // best-effort — prompt stays as built
+    }
+
     if (operatorName && operatorName.trim()) {
       resolvedPrompt = this.substituteSignoff(resolvedPrompt, operatorName);
     }

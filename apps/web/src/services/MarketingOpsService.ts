@@ -4999,6 +4999,25 @@ class MarketingOpsService extends AdminApiSingleton {
     return (result.data?.data ?? result.data ?? []) as OutreachProblem[];
   }
 
+  /** Resolve a verification gate on the campaign's persisted engagement
+   *  brief — writes status (+optional note) into audit_data. */
+  async resolveBriefGate(
+    campaignId: string,
+    gateIndex: number,
+    status: 'pending' | 'answered' | 'skipped' | 'needs_reconfirmation',
+    resolutionNote?: string,
+  ): Promise<void> {
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/${encodeURIComponent(campaignId)}/engagement-brief/gates/${gateIndex}/resolve`,
+      { method: 'POST', body: JSON.stringify({ status, resolution_note: resolutionNote }) },
+      `mkt-ops-brief-gate-${campaignId}-${gateIndex}`,
+      0,
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : 'Failed to resolve gate');
+    }
+  }
+
   // ─── Deliverable Construction ──────────────────────────────────────────
 
   // Deliverable Source Material (spec: marketing_ops_deliverable_source_material_spec.md)

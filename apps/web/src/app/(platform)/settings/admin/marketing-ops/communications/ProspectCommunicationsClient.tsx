@@ -247,6 +247,53 @@ export default function ProspectCommunicationsClient({ initialProspectId }: Prop
     }
   }, [selectedId, fetchTimeline]);
 
+  // ─── Campaign verification gates (engagement-brief spine, 4.4b) ────────
+  // When the prospect has a linked campaign with a persisted engagement
+  // brief, its verification_gates render as a checklist here — a logged
+  // touch can answer the gate in place instead of a second operator asking
+  // the owner a question that was already resolved.
+  const [briefGates, setBriefGates] = useState<{ gate: string; status: string; who_can_answer?: string; blocks?: string; resolution_note?: string }[] | null>(null);
+  const [briefId, setBriefId] = useState<string | null>(null);
+  const [gateBusy, setGateBusy] = useState<number | null>(null);
+
+  useEffect(() => {
+    const campaignId = timeline?.prospect?.campaign_id;
+    setBriefGates(null);
+    setBriefId(null);
+    if (!campaignId) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const audits = await marketingOpsService.listAudits(campaignId);
+        const brief = (audits ?? [])
+          .filter((a: any) => a.platform === 'engagement_brief')
+          .sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0];
+        const gates = (brief?.audit_data as any)?.verification_gates;
+        if (!cancelled && brief && Array.isArray(gates)) {
+          setBriefGates(gates);
+          setBriefId(brief.id);
+        }
+      } catch {
+        // no brief / audit read failed — the gate block stays hidden
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [timeline?.prospect?.campaign_id]);
+
+  const resolveBriefGate = async (idx: number, status: 'answered' | 'skipped') => {
+    const campaignId = timeline?.prospect?.campaign_id;
+    if (!campaignId) return;
+    setGateBusy(idx);
+    try {
+      await marketingOpsService.resolveBriefGate(campaignId, idx, status);
+      setBriefGates((prev) => prev && prev.map((g, i) => (i === idx ? { ...g, status } : g)));
+    } catch (err: any) {
+      setActionError(err.message || 'Failed to resolve gate');
+    } finally {
+      setGateBusy(null);
+    }
+  };
+
   // ─── Card actions ─────────────────────────────────────────────────────
 
   // Sync the hours editor from the loaded timeline (snapshot.hours, falling
@@ -590,6 +637,52 @@ export default function ProspectCommunicationsClient({ initialProspectId }: Prop
                 )}
               </div>
             </div>
+
+            {/* Verification gates — the campaign brief's open questions.
+                Resolve them here while logging the touch; an answered gate
+                doesn't get re-asked on the next call (4.4b). */}
+            {briefGates && briefGates.some((g) => g.status !== 'answered' && g.status !== 'skipped') && (
+              <div className="mt-3 rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50/50 dark:bg-blue-900/10 p-3">
+                <p className="text-xs font-semibold uppercase tracking-wide text-blue-800 dark:text-blue-300">
+                  Verification gates — campaign brief
+                </p>
+                <ul className="mt-2 space-y-1.5">
+                  {briefGates.map((g, i) => {
+                    const open = g.status !== 'answered' && g.status !== 'skipped';
+                    return (
+                      <li key={i} className={`flex items-start justify-between gap-2 text-xs ${open ? 'text-gray-800 dark:text-gray-200' : 'text-gray-400 dark:text-gray-500'}`}>
+                        <span className="flex-1">
+                          {g.gate}
+                          {g.who_can_answer && <span className="ml-1 text-[10px] text-gray-400">(ask {g.who_can_answer.replace(/_/g, ' ')})</span>}
+                        </span>
+                        {open ? (
+                          <span className="flex shrink-0 items-center gap-1">
+                            <button
+                              type="button"
+                              disabled={gateBusy === i}
+                              onClick={() => resolveBriefGate(i, 'answered')}
+                              className="rounded px-1.5 py-0.5 text-[10px] text-green-700 hover:bg-green-100 dark:text-green-300 dark:hover:bg-green-900/20 disabled:opacity-50"
+                            >
+                              answered
+                            </button>
+                            <button
+                              type="button"
+                              disabled={gateBusy === i}
+                              onClick={() => resolveBriefGate(i, 'skipped')}
+                              className="rounded px-1.5 py-0.5 text-[10px] text-gray-500 hover:bg-gray-100 dark:hover:bg-neutral-700 disabled:opacity-50"
+                            >
+                              skip
+                            </button>
+                          </span>
+                        ) : (
+                          <span className="shrink-0 text-[10px] uppercase tracking-wide">{g.status}</span>
+                        )}
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            )}
 
             {/* Action feedback */}
             {actionError && (

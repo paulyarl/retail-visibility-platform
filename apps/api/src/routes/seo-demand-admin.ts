@@ -2,6 +2,7 @@
  * Admin Search Demand Routes (data-driven seeding)
  *
  *   GET  /api/admin/seo-demand/summary         — headline counts + last ingest
+ *   GET  /api/admin/seo-demand/facets          — distinct categories/cities for filter dropdowns
  *   GET  /api/admin/seo-demand/signals         — query signals (sort/filter/paginate)
  *   GET  /api/admin/seo-demand/gaps            — category × market demand vs seeds
  *   GET  /api/admin/seo-demand/markets         — market demand vs seeds
@@ -96,6 +97,33 @@ router.get('/summary', requirePlatformAdmin, async (_req: Request, res: Response
     res.json({ success: true, routes: routes.rows, ingest: last.rows[0] });
   } catch (error) {
     fail('GET /api/admin/seo-demand/summary', res, error);
+  }
+});
+
+/** GET /facets — distinct filter values for the category/city dropdowns.
+ *  Values are returned verbatim so they round-trip through the ILIKE filters. */
+router.get('/facets', requirePlatformAdmin, async (_req: Request, res: Response) => {
+  try {
+    const pool = getDirectPool();
+    const [categories, cities] = await Promise.all([
+      pool.query(
+        `SELECT DISTINCT category FROM seo_query_signals
+         WHERE category IS NOT NULL AND btrim(category) <> '' AND impressions_90d > 0
+         ORDER BY 1`,
+      ),
+      pool.query(
+        `SELECT DISTINCT city, state FROM seo_query_signals
+         WHERE city IS NOT NULL AND btrim(city) <> '' AND impressions_90d > 0
+         ORDER BY 1, 2`,
+      ),
+    ]);
+    res.json({
+      success: true,
+      categories: categories.rows.map((r) => r.category),
+      cities: cities.rows,
+    });
+  } catch (error) {
+    fail('GET /api/admin/seo-demand/facets', res, error);
   }
 });
 

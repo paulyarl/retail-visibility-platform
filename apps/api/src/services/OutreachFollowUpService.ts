@@ -217,6 +217,21 @@ export class OutreachFollowUpService extends BaseService {
       closeVariant,
     );
 
+    // Engagement-brief spine (OQ7 migration): ranked play + do_not_claim
+    // guardrails appended so the follow-up can't contradict the spine.
+    try {
+      const { loadBriefSpine, applyArchetypeOverlay, spinePromptBlock } = await import(
+        './engagement-brief/brief-spine'
+      );
+      const pack = await loadBriefSpine(this.prisma, input.campaignId);
+      if (pack) {
+        const spine = applyArchetypeOverlay(pack.spine, selection.archetype);
+        resolvedPrompt = `${resolvedPrompt}\n\n${spinePromptBlock(spine)}`;
+      }
+    } catch {
+      // best-effort — prompt stays as built
+    }
+
     // Substitute operator name in the signoff if provided.
     if (input.operatorName && input.operatorName.trim()) {
       resolvedPrompt = this.substituteSignoff(resolvedPrompt, input.operatorName);

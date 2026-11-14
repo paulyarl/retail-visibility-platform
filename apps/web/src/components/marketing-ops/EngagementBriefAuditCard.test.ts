@@ -112,10 +112,13 @@ describe('EngagementBriefAuditCard', () => {
 
   it('renders ranked pains with severity, confidence, and visibility badges', () => {
     const html = render(auditOf(BRIEF));
-    expect(html).toContain('Pains (2)');
+    expect(html).toContain('Ranked Pains (2)');
     expect(html).toContain('never see the store');
-    expect(html).toContain('verified on surface');
-    expect(html).toContain('public safe');
+    // Badge triage (D9): verified_on_surface + public_safe are the default
+    // states and stay silent; only non-default states badge.
+    expect(html).not.toContain('verified on surface');
+    expect(html).not.toContain('public safe');
+    expect(html).toContain('inferred');
     expect(html).toContain('internal');
     // evidence_ref resolves through evidence_index to the audit field path
     expect(html).toContain('platforms.google.category_fit_assessment');
@@ -124,8 +127,7 @@ describe('EngagementBriefAuditCard', () => {
   it('marks the primary hook pain per engagement_shape', () => {
     const html = render(auditOf(BRIEF));
     expect(html).toContain('primary hook');
-    expect(html).toContain('Lead with:');
-    expect(html).toContain('pain');
+    expect(html).toContain('The play — pain first');
   });
 
   it('renders assets with underexposure and how_to_use', () => {
@@ -180,5 +182,59 @@ describe('EngagementBriefAuditCard', () => {
     expect(html).toContain('EMPTY BIZ');
     expect(html).toContain('no ranked spine items');
     expect(html).toContain('No Pass-1 audit exists');
+  });
+
+  // ─── v2 spine fields (D9 play panel + checklist + staleness) ──────────
+
+  const V2_BRIEF = {
+    ...BRIEF,
+    brief_version: 2,
+    staleness: 'stale',
+    assembly: 'deterministic',
+    archetype_domain: 'review',
+    pains: [
+      {
+        ...BRIEF.pains[0],
+        domain: 'review',
+        regular: 'Your profile has 600 reviews and no responses.',
+        hook: 'Your newest review is a 1-star accusation with no reply.',
+        fix: 'A review-response routine.',
+      },
+      BRIEF.pains[1],
+    ],
+    verification_gates: [
+      { gate: 'Operator-checkable gate', blocks: 'p1', who_can_answer: 'operator', status: 'pending' },
+      { gate: 'Owner question gate', blocks: 'p3', who_can_answer: 'owner', status: 'answered', resolution_note: 'confirmed 11/14' },
+    ],
+  };
+
+  it('renders the play panel with spoken lines + addressing capabilities', () => {
+    const html = render(auditOf(V2_BRIEF));
+    expect(html).toContain('The play — pain first');
+    expect(html).toContain('Your profile has 600 reviews and no responses.');
+    expect(html).toContain('Your newest review is a 1-star accusation');
+    expect(html).toContain('A review-response routine.');
+    // addressed-by chips — claim_service addresses p1
+    expect(html).toContain('fixes:');
+    expect(html).toContain('claim service');
+  });
+
+  it('surfaces the staleness badge and archetype-domain chip', () => {
+    const html = render(auditOf(V2_BRIEF));
+    expect(html).toContain('stale — newer audit evidence');
+    expect(html).toContain('ranked for review');
+  });
+
+  it('renders gates as a checklist ordered operator-clearable first with status', () => {
+    const html = render(auditOf(V2_BRIEF));
+    const opIdx = html.indexOf('Operator-checkable gate');
+    const ownerIdx = html.indexOf('Owner question gate');
+    expect(opIdx).toBeGreaterThan(-1);
+    expect(ownerIdx).toBeGreaterThan(-1);
+    // operator-clearable gate renders before the owner gate
+    expect(opIdx).toBeLessThan(ownerIdx);
+    expect(html).toContain('answered');
+    expect(html).toContain('pending');
+    expect(html).toContain('confirmed 11/14');
   });
 });
