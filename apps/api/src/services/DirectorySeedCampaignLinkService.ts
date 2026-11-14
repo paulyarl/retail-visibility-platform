@@ -1380,6 +1380,15 @@ class DirectorySeedCampaignLinkService {
           mc.business_name ILIKE ${namePattern}
           OR (mc.city = ${s.city} AND mc.category ILIKE ${namePattern})
         )
+        -- A campaign already primary on a different seed owns that location's
+        -- surface — same-name multi-location businesses (chains) otherwise
+        -- cross-suggest each other's campaigns.
+        AND NOT EXISTS (
+          SELECT 1 FROM directory_seed_campaign_links dscl2
+          WHERE dscl2.campaign_id = mc.id
+            AND dscl2.link_role = 'primary'
+            AND dscl2.seed_id <> ${seedId}
+        )
         AND (
           ${q} = '' OR
           mc.business_name ILIKE ${qNamePattern} OR
