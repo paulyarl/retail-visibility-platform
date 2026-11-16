@@ -322,6 +322,29 @@ export default function PromptWorkspaceClient({ templateId, initialCampaignId, i
     return filtered;
   }, [campaigns, template, isIntelligenceDiscovery, isIntelligenceEstablishment, templateFocus, initialCampaignId]);
 
+  // Category filter for the flat (non-cascade) campaign dropdown — narrows
+  // long same-scope lists (e.g. directory_enrichment set campaigns).
+  const [flatCategoryFilter, setFlatCategoryFilter] = useState('');
+  const flatCategories = useMemo(() => {
+    const seen = new Set<string>();
+    const list: string[] = [];
+    for (const c of compatibleCampaigns) {
+      if (c.category && !seen.has(c.category)) {
+        seen.add(c.category);
+        list.push(c.category);
+      }
+    }
+    return list.sort((a, b) => a.localeCompare(b));
+  }, [compatibleCampaigns]);
+  const flatDropdownCampaigns = useMemo(() => {
+    if (!flatCategoryFilter) return compatibleCampaigns;
+    const filtered = compatibleCampaigns.filter((c) => c.category === flatCategoryFilter);
+    if (selectedCampaign && !filtered.some((c) => c.id === selectedCampaign.id)) {
+      return [selectedCampaign, ...filtered];
+    }
+    return filtered;
+  }, [compatibleCampaigns, flatCategoryFilter, selectedCampaign]);
+
   // Distinct categories among the filtered intelligence-scope campaigns —
   // drives the first dropdown in the category → campaign cascade.
   const intelligenceCategories = useMemo(() => {
@@ -1085,6 +1108,21 @@ export default function PromptWorkspaceClient({ templateId, initialCampaignId, i
                 <>
                   {/* Default: flat campaign dropdown (business/category/city
                       scopes + intelligence establishment template) */}
+                  {flatCategories.length > 1 && (
+                    <div>
+                      <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Category</label>
+                      <select
+                        value={flatCategoryFilter}
+                        onChange={(e) => setFlatCategoryFilter(e.target.value)}
+                        className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white dark:bg-neutral-900 dark:border-neutral-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="">All categories</option>
+                        {flatCategories.map((cat) => (
+                          <option key={cat} value={cat}>{cat}</option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
                   <div>
                     <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Select Campaign</label>
                     <select
@@ -1093,7 +1131,7 @@ export default function PromptWorkspaceClient({ templateId, initialCampaignId, i
                       className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white dark:bg-neutral-900 dark:border-neutral-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                     >
                       <option value="">— Select a campaign —</option>
-                      {compatibleCampaigns.map((c) => (
+                      {flatDropdownCampaigns.map((c) => (
                         <option key={c.id} value={c.id}>{c.title || c.business_name || `${c.category} · ${c.city}`} ({c.scope}, {c.city})</option>
                       ))}
                     </select>
