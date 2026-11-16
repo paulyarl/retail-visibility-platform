@@ -15,7 +15,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // Use vi.hoisted so mock instances are stable across factory + test code
-const { mockProfileService, mockPromptService, mockCampaignService, mockAiProvider, mockHotProspectService, mockComposerService, mockMarketContextLoader, mockFormatEstablishment, mockFormatDiscovery, mockCatalogService, mockGeographyGridService, mockLocationEnrichmentService, mockVocabService, mockFormatEnrichmentVocab } = vi.hoisted(() => {
+const { mockProfileService, mockPromptService, mockCampaignService, mockAiProvider, mockHotProspectService, mockComposerService, mockMarketContextLoader, mockFormatEstablishment, mockFormatDiscovery, mockCatalogService, mockGeographyGridService, mockLocationEnrichmentService, mockVocabService, mockFormatEnrichmentVocab, mockCategoryMarketEnrichmentService } = vi.hoisted(() => {
   const mockProfileService = {
     resolve: vi.fn(async (_category: string, _focus?: string) => null),
     resolveCategoryIntelligence: vi.fn(async (_category: string, _city?: string | null, _platform?: string | null) => null),
@@ -71,7 +71,11 @@ const { mockProfileService, mockPromptService, mockCampaignService, mockAiProvid
     findRegisteredValue: vi.fn(async () => null),
   };
   const mockFormatEnrichmentVocab = vi.fn(() => '');
-  return { mockProfileService, mockPromptService, mockCampaignService, mockAiProvider, mockHotProspectService, mockComposerService, mockMarketContextLoader, mockFormatEstablishment, mockFormatDiscovery, mockCatalogService, mockGeographyGridService, mockLocationEnrichmentService, mockVocabService, mockFormatEnrichmentVocab };
+  const mockCategoryMarketEnrichmentService = {
+    coveredCategoryMarketKeys: vi.fn(async () => new Set<string>()),
+    applyEnrichmentPacket: vi.fn(async () => null),
+  };
+  return { mockProfileService, mockPromptService, mockCampaignService, mockAiProvider, mockHotProspectService, mockComposerService, mockMarketContextLoader, mockFormatEstablishment, mockFormatDiscovery, mockCatalogService, mockGeographyGridService, mockLocationEnrichmentService, mockVocabService, mockFormatEnrichmentVocab, mockCategoryMarketEnrichmentService };
 });
 
 vi.mock('../intelligence/IntelligenceProfileService', () => ({
@@ -129,6 +133,22 @@ vi.mock('../intelligence/GeographyGridService', () => ({
 // same module.
 vi.mock('../LocationMarketEnrichmentService', () => ({
   default: mockLocationEnrichmentService,
+}));
+
+// Intercepts the lazy `import('./CategoryMarketEnrichmentService.js')` inside
+// uncoveredSweepMarkets / applyEnrichmentFromOutput — the sweep-set coverage
+// read defaults to "nothing covered" so stored markets render unfiltered
+// unless a test opts in. The coverage-key helper keeps a real (simplified)
+// implementation so tests can predict the keys coveredCategoryMarketKeys
+// is expected to return.
+vi.mock('../CategoryMarketEnrichmentService', () => ({
+  default: { getInstance: () => mockCategoryMarketEnrichmentService },
+  categoryMarketCoverageKey: (category: any, city: any, state: any) => {
+    const categoryKey = String(category ?? '').trim().toLowerCase().replace(/[_-]+/g, ' ').replace(/\s+/g, ' ');
+    const c = String(city ?? '').trim().toLowerCase();
+    const s = String(state ?? '').trim().toLowerCase();
+    return categoryKey && c && s ? `${categoryKey}|${c}|${s}` : null;
+  },
 }));
 
 // Intercepts the lazy `import('./IdentityEvidenceService.js')` inside
@@ -190,6 +210,9 @@ describe('MarketingExecutionService.resolvePrompt (§1B profile amplification)',
     // VOCABULARY block on enrichment renders by default.
     mockVocabService.loadVocabulary.mockImplementation(async () => ({ directoryLabels: [], registeredLabels: [] }));
     mockFormatEnrichmentVocab.mockImplementation(() => '');
+    // Reset the sweep-set coverage read to "nothing covered" — stored
+    // shelf_sweep markets render unfiltered unless a test opts in.
+    mockCategoryMarketEnrichmentService.coveredCategoryMarketKeys.mockImplementation(async () => new Set<string>());
   });
 
   const makeTemplate = (promptType: string, body = 'Hello {{business_name}} in {{category}}') => ({
@@ -1696,6 +1719,79 @@ describe('MarketingExecutionService.resolvePrompt (§1B profile amplification)',
       } finally {
         (service as any).prisma = realPrisma;
       }
+    });
+
+    it('drops already AI-enriched markets from {{markets}} on a rerun', async () => {
+      mockCategoryMarketEnrichmentService.coveredCategoryMarketKeys.mockResolvedValueOnce(
+        new Set(['butcher shop|auburn|in', 'kebab house|fort wayne|in']),
+      );
+
+      const { renderedPrompt } = await service.resolvePrompt({
+        template: makeSetTemplate(),
+        campaign: makeSetCampaign(SET_MARKETS),
+        variables: undefined,
+      });
+
+      expect(renderedPrompt).toContain('- Halal Market — Fort Wayne, IN');
+      expect(renderedPrompt).not.toContain('- Butcher Shop — Auburn, IN');
+      expect(renderedPrompt).not.toContain('- Kebab House — Fort Wayne, IN');
+      expect(renderedPrompt).toContain('2 sweep markets already AI-enriched');
+    });
+
+    it('renders the fully-covered line when every stored market is enriched', async () => {
+      mockCategoryMarketEnrichmentService.coveredCategoryMarketKeys.mockResolvedValueOnce(
+        new Set(['halal market|fort wayne|in', 'butcher shop|auburn|in', 'kebab house|fort wayne|in']),
+      );
+
+      const { renderedPrompt } = await service.resolvePrompt({
+        template: makeSetTemplate(),
+        campaign: makeSetCampaign(SET_MARKETS),
+        variables: undefined,
+      });
+
+      expect(renderedPrompt).toContain('sweep set fully covered');
+      expect(renderedPrompt).not.toContain('- Halal Market — Fort Wayne, IN');
+    });
+
+    it('injects CITY PROFILE blocks only for cities still being enriched', async () => {
+      // The Auburn market is already covered — its city profile must not ship.
+      mockCategoryMarketEnrichmentService.coveredCategoryMarketKeys.mockResolvedValueOnce(
+        new Set(['butcher shop|auburn|in']),
+      );
+      const realPrisma = (service as any).prisma;
+      (service as any).prisma = {
+        $queryRaw: vi.fn(async () => [
+          { context: { city_profile: { metro_description: 'Mid-size Midwest metro', major_industries: ['logistics'] } } },
+        ]),
+      };
+      try {
+        const { renderedPrompt } = await service.resolvePrompt({
+          template: makeSetTemplate(),
+          campaign: makeSetCampaign(SET_MARKETS),
+          variables: undefined,
+        });
+
+        expect(renderedPrompt).toContain('City: Fort Wayne, IN');
+        expect(renderedPrompt).not.toContain('City: Auburn, IN');
+      } finally {
+        (service as any).prisma = realPrisma;
+      }
+    });
+
+    it('honors an explicit {{markets}} override verbatim — no coverage filter', async () => {
+      mockCategoryMarketEnrichmentService.coveredCategoryMarketKeys.mockResolvedValueOnce(
+        new Set(['butcher shop|auburn|in']),
+      );
+
+      const { renderedPrompt } = await service.resolvePrompt({
+        template: makeSetTemplate(),
+        campaign: makeSetCampaign(SET_MARKETS),
+        variables: { markets: '- Butcher Shop — Auburn, IN' },
+      });
+
+      expect(mockCategoryMarketEnrichmentService.coveredCategoryMarketKeys).not.toHaveBeenCalled();
+      expect(renderedPrompt).toContain('- Butcher Shop — Auburn, IN');
+      expect(renderedPrompt).not.toContain('already AI-enriched');
     });
   });
 

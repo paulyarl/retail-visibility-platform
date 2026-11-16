@@ -57,6 +57,24 @@ export function isCampaignSourcedProvenance(source: string | null | undefined): 
   return CAMPAIGN_SOURCED_PROVENANCE.has(source ?? '');
 }
 
+/**
+ * Normalized coverage key for a (category, city, state) market — the same
+ * key shape ProvingGroundShelfSweepService uses to classify sweep
+ * outcomes. Null when any part fails normalization; invalid markets never
+ * count as covered.
+ */
+export function categoryMarketCoverageKey(
+  category: string | null | undefined,
+  city: string | null | undefined,
+  state: string | null | undefined,
+): string | null {
+  const categoryKey = normalizeCategoryKey(category ?? '');
+  const normalizedCity = normalizeReferenceCity(city);
+  const normalizedState = normalizeReferenceState(state);
+  if (!categoryKey || !normalizedCity || !normalizedState) return null;
+  return `${categoryKey}|${normalizedCity.toLowerCase()}|${normalizedState.toLowerCase()}`;
+}
+
 // Prisma.join throws on an empty array — emit a literal empty text[] instead.
 const textArraySql = (arr: string[]) =>
   arr.length ? Prisma.sql`ARRAY[${Prisma.join(arr)}]::text[]` : Prisma.sql`ARRAY[]::text[]`;
@@ -284,6 +302,44 @@ class CategoryMarketEnrichmentService extends BaseService {
       listingsSkipped: listingResult.skipped,
       skipReasons: listingResult.skipReasons,
     };
+  }
+
+  /**
+   * Batch coverage read: the coverage keys of the given markets that already
+   * carry an AI-produced packet (composer_version >= CAMPAIGN_COMPOSER_VERSION)
+   * — the same "covered" classification the PG shelf sweep applies. Used to
+   * keep a stored shelf_sweep set idempotent across reruns: markets enriched
+   * since the set was written drop out of the prompt and out of the apply
+   * loop so a rerun neither re-asks for nor overwrites finished work.
+   */
+  async coveredCategoryMarketKeys(
+    markets: Array<{ category?: string | null; city?: string | null; state?: string | null }>,
+    ctx?: RequestCtx,
+  ): Promise<Set<string>> {
+    const pairs = new Map<string, { categoryKey: string; city: string; state: string }>();
+    for (const m of markets) {
+      const categoryKey = normalizeCategoryKey(m?.category ?? '');
+      const city = normalizeReferenceCity(m?.city);
+      const state = normalizeReferenceState(m?.state);
+      if (!categoryKey || !city || !state) continue;
+      pairs.set(`${categoryKey}|${city.toLowerCase()}|${state.toLowerCase()}`, { categoryKey, city, state });
+    }
+    if (pairs.size === 0) return new Set();
+
+    const rows = await this.prisma.directory_category_enrichment.findMany({
+      where: {
+        OR: [...pairs.values()].map((p) => ({ category_key: p.categoryKey, city: p.city, state: p.state })),
+      },
+      select: { category_key: true, city: true, state: true, composer_version: true },
+    });
+    const covered = new Set<string>();
+    for (const r of rows) {
+      if ((r.composer_version ?? 1) >= CAMPAIGN_COMPOSER_VERSION) {
+        const key = categoryMarketCoverageKey(r.category_key, r.city, r.state);
+        if (key) covered.add(key);
+      }
+    }
+    return covered;
   }
 
   /**

@@ -1496,10 +1496,33 @@ export class MarketingPromptService extends BaseService {
             // PG shelf sweep — one packet per market; each entry routes on
             // its own category_name/city/state (the campaign row only names
             // the anchor market). Partial success counts as applied.
-            const { default: CategoryMarketEnrichmentService } = await import('./CategoryMarketEnrichmentService.js');
+            const { default: CategoryMarketEnrichmentService, categoryMarketCoverageKey } = await import('./CategoryMarketEnrichmentService.js');
+            const enrichmentService = CategoryMarketEnrichmentService.getInstance();
+            const packetMarkets = (parsedJson as any).markets ?? [];
+            // Covered-guard: an imported packet can be stale relative to the
+            // render — markets enriched by another run since are skipped so
+            // a rerun can't overwrite fresher AI copy.
+            const coveredKeys = await enrichmentService.coveredCategoryMarketKeys(
+              packetMarkets.map((m: any) => ({
+                category: m.category_name ?? m.category_key ?? null,
+                city: m.city ?? null,
+                state: m.state ?? null,
+              })),
+              ctx,
+            );
             let appliedCount = 0;
-            for (const market of (parsedJson as any).markets ?? []) {
-              const applied = await CategoryMarketEnrichmentService.getInstance().applyEnrichmentPacket({
+            let skippedCovered = 0;
+            for (const market of packetMarkets) {
+              const coverageKey = categoryMarketCoverageKey(
+                market.category_name ?? market.category_key,
+                market.city,
+                market.state,
+              );
+              if (coverageKey && coveredKeys.has(coverageKey)) {
+                skippedCovered += 1;
+                continue;
+              }
+              const applied = await enrichmentService.applyEnrichmentPacket({
                 campaign: {
                   id: input.campaignId,
                   category: market.category_name ?? market.category_key ?? null,
@@ -1513,12 +1536,20 @@ export class MarketingPromptService extends BaseService {
               if (applied?.categoryEnrichmentId) appliedCount += 1;
             }
             enrichmentApplied = appliedCount > 0;
-            if (appliedCount < ((parsedJson as any).markets?.length ?? 0)) {
+            if (skippedCovered > 0) {
+              logger.info('Set enrichment skipped already-covered markets on import', ctx, {
+                campaignId: input.campaignId,
+                executionId,
+                skippedCovered,
+              });
+            }
+            if (appliedCount + skippedCovered < packetMarkets.length) {
               logger.warn('Set enrichment partially applied on import', ctx, {
                 campaignId: input.campaignId,
                 executionId,
                 applied: appliedCount,
-                total: (parsedJson as any).markets?.length,
+                skippedCovered,
+                total: packetMarkets.length,
               });
             }
           } else if (schemaName === CATEGORY_ENRICHMENT_SCHEMA_NAME) {
