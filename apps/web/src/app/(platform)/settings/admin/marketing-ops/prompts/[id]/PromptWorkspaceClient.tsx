@@ -418,7 +418,7 @@ export default function PromptWorkspaceClient({ templateId, initialCampaignId, i
       // hydrate the Execution Result panel via getExecution(:id) for the full
       // detail.
       const [campResult, execs] = await Promise.all([
-        marketingOpsService.listCampaigns({ limit: 100 }),
+        marketingOpsService.listCampaigns({ limit: 100, scope: t.scope }),
         marketingOpsService.listExecutions({ templateId }),
       ]);
       let campaignItems: Campaign[] = campResult.items;
