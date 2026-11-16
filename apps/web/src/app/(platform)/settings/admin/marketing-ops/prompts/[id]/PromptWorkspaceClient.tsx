@@ -421,7 +421,13 @@ export default function PromptWorkspaceClient({ templateId, initialCampaignId, i
         marketingOpsService.listCampaigns({ limit: 100 }),
         marketingOpsService.listExecutions({ templateId }),
       ]);
-      setCampaigns(campResult.items);
+      let campaignItems: Campaign[] = campResult.items;
+      if (initialCampaignId && !campaignItems.some((c) => c.id === initialCampaignId)) {
+        try {
+          campaignItems = [await marketingOpsService.getCampaign(initialCampaignId), ...campaignItems];
+        } catch { /* deep-linked campaign missing or inaccessible — leave the page as loaded */ }
+      }
+      setCampaigns(campaignItems);
       setExecutions(execs);
       // Hydrate the Execution Result panel from the most recent *successful*
       // execution so a transient failure doesn't blank out the panel — the
@@ -445,7 +451,7 @@ export default function PromptWorkspaceClient({ templateId, initialCampaignId, i
     } finally {
       setLoading(false);
     }
-  }, [templateId]);
+  }, [templateId, initialCampaignId]);
 
   useEffect(() => {
     fetchTemplate();
