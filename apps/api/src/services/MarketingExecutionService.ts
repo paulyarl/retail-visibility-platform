@@ -488,17 +488,42 @@ export class MarketingExecutionService extends BaseService {
       // category/city/state only name the anchor market. Partial success is
       // allowed: every applied market is a real row; failures are collected
       // and only a zero-applied run throws.
-      const { default: CategoryMarketEnrichmentService } = await import('./CategoryMarketEnrichmentService.js');
+      const { default: CategoryMarketEnrichmentService, categoryMarketCoverageKey } = await import('./CategoryMarketEnrichmentService.js');
+      const enrichmentService = CategoryMarketEnrichmentService.getInstance();
+      const packetMarkets = parsedJson.markets as any[];
+      // Covered-guard: the prompt drops already-enriched markets at render
+      // time, but a packet can outlive its render — markets enriched by a
+      // parallel run between render and apply, or a stale packet re-imported
+      // later. Skipping keeps a rerun from overwriting fresher AI copy; an
+      // all-covered run is a legitimate no-op, not a failure.
+      const coveredKeys = await enrichmentService.coveredCategoryMarketKeys(
+        packetMarkets.map((m) => ({
+          category: m.category_name ?? m.category_key ?? null,
+          city: m.city ?? null,
+          state: m.state ?? null,
+        })),
+        ctx,
+      );
       const failures: string[] = [];
       let appliedCount = 0;
-      for (const market of parsedJson.markets as any[]) {
+      let skippedCovered = 0;
+      for (const market of packetMarkets) {
+        const coverageKey = categoryMarketCoverageKey(
+          market.category_name ?? market.category_key,
+          market.city,
+          market.state,
+        );
+        if (coverageKey && coveredKeys.has(coverageKey)) {
+          skippedCovered += 1;
+          continue;
+        }
         const marketRef = {
           id: input.campaign.id,
           category: market.category_name ?? market.category_key ?? null,
           city: market.city ?? null,
           state: market.state ?? null,
         };
-        const applied = await CategoryMarketEnrichmentService.getInstance().applyEnrichmentPacket({
+        const applied = await enrichmentService.applyEnrichmentPacket({
           campaign: marketRef,
           packet: market,
           executionId: input.executionId,
@@ -510,7 +535,14 @@ export class MarketingExecutionService extends BaseService {
           failures.push(`${market.category_name ?? market.category_key ?? '?'} ${market.city ?? '?'},${market.state ?? '?'}: ${JSON.stringify(applied?.skipReasons ?? {})}`);
         }
       }
-      if (appliedCount === 0) {
+      if (skippedCovered > 0) {
+        logger.info('Set enrichment skipped already-covered markets', ctx, {
+          executionId: input.executionId,
+          campaignId: input.campaign.id,
+          skippedCovered,
+        });
+      }
+      if (appliedCount === 0 && skippedCovered === 0) {
         throw new Error(`Set enrichment apply produced no rows (${failures.join('; ') || 'empty markets[]'})`);
       }
       if (failures.length > 0) {
@@ -674,6 +706,34 @@ export class MarketingExecutionService extends BaseService {
   }
 
   /**
+   * Rerun coverage filter for a stored shelf_sweep market set — drops
+   * markets that already carry an AI-produced packet
+   * (composer_version >= 2). A coverage-read failure degrades to the stored
+   * set: a directory_category_enrichment hiccup must not blank the prompt.
+   */
+  private async uncoveredSweepMarkets(
+    markets: Array<{ category?: string | null; city?: string | null; state?: string | null }>,
+    ctx?: RequestCtx,
+  ): Promise<Array<{ category: string; city: string; state: string }>> {
+    try {
+      const { default: CategoryMarketEnrichmentService, categoryMarketCoverageKey } =
+        await import('./CategoryMarketEnrichmentService.js');
+      const covered = await CategoryMarketEnrichmentService.getInstance()
+        .coveredCategoryMarketKeys(markets, ctx);
+      if (covered.size === 0) return markets as Array<{ category: string; city: string; state: string }>;
+      return markets.filter((m) => {
+        const key = categoryMarketCoverageKey(m?.category, m?.city, m?.state);
+        return !key || !covered.has(key);
+      }) as Array<{ category: string; city: string; state: string }>;
+    } catch (err) {
+      logger.warn('Sweep-market coverage check failed — using stored set', ctx, {
+        error: (err as Error).message,
+      });
+      return markets as Array<{ category: string; city: string; state: string }>;
+    }
+  }
+
+  /**
    * Resolve a prompt for a campaign with profile-aware amplification (§1B, GAP-P7).
    *
    * This is the shared resolution seam used by both renderPrompt() and
@@ -719,14 +779,38 @@ export class MarketingExecutionService extends BaseService {
     // the sweep payload on discovery_context.shelf_sweep.markets so the
     // category-scope set template can enumerate the residual markets. Runs
     // outside the business-scope block — sweep campaigns are scope='category'.
+    //
+    // Rerun coverage filter: the stored set is the sweep-time work queue, not
+    // a live roster — markets that already carry an AI packet
+    // (composer_version >= 2) drop out so a rerun only asks for what is still
+    // missing. The filtered list is hoisted for the CITY PROFILE injection
+    // below so filtered cities' profiles don't ship either. An explicit
+    // {{markets}} override is honored verbatim (operator-directed rerun).
+    let sweepSetMarkets: Array<{ category: string; city: string; state: string }> | null = null;
     if (
       outputSchemaName === CATEGORY_SET_ENRICHMENT_SCHEMA_NAME
       && !(effectiveVariables.markets && String(effectiveVariables.markets).trim())
     ) {
-      const sweepMarkets = (input.campaign.discovery_context as any)?.shelf_sweep?.markets;
-      effectiveVariables.markets = Array.isArray(sweepMarkets) && sweepMarkets.length > 0
-        ? sweepMarkets.map((m: any) => `- ${m.category} — ${m.city}, ${m.state}`).join('\n')
-        : '(no sweep set on this campaign — enrich the single market below)';
+      const stored = (input.campaign.discovery_context as any)?.shelf_sweep?.markets;
+      if (Array.isArray(stored) && stored.length > 0) {
+        sweepSetMarkets = await this.uncoveredSweepMarkets(stored, ctx);
+        if (sweepSetMarkets.length > 0) {
+          const lines = sweepSetMarkets.map((m) => `- ${m.category} — ${m.city}, ${m.state}`);
+          const coveredCount = stored.length - sweepSetMarkets.length;
+          if (coveredCount > 0) {
+            lines.push(`(${coveredCount} sweep market${coveredCount === 1 ? '' : 's'} already AI-enriched — skipped this run)`);
+          }
+          effectiveVariables.markets = lines.join('\n');
+        } else {
+          // Nothing left to do — still ask for the anchor packet so the
+          // output stays schema-valid; the apply guard drops it if the
+          // anchor market is covered too.
+          effectiveVariables.markets =
+            '(sweep set fully covered — every market already carries an AI packet; produce a single packet for the anchor market only)';
+        }
+      } else {
+        effectiveVariables.markets = '(no sweep set on this campaign — enrich the single market below)';
+      }
     }
 
     if (input.campaign && campaignScope === 'business') {
@@ -2042,7 +2126,11 @@ export class MarketingExecutionService extends BaseService {
       // profiles). When the set is empty or no profiles exist, fall through
       // to the single-market path below.
       if (outputSchemaName === CATEGORY_SET_ENRICHMENT_SCHEMA_NAME) {
-        const rawMarkets = (input.campaign as any).discovery_context?.shelf_sweep?.markets;
+        // When {{markets}} was auto-sourced above, sweepSetMarkets is the
+        // coverage-filtered set — inject profiles only for cities still
+        // being enriched. An operator-supplied {{markets}} override leaves
+        // sweepSetMarkets null and the stored set drives profiles as before.
+        const rawMarkets = sweepSetMarkets ?? (input.campaign as any).discovery_context?.shelf_sweep?.markets;
         const cities = new Map<string, { city: string; state: string }>();
         for (const m of Array.isArray(rawMarkets) ? rawMarkets : []) {
           const c = String(m?.city ?? '').trim();
